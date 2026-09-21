@@ -18,9 +18,10 @@ export async function apiFetch<T>(
   options: RequestInit = {},
 ): Promise<T> {
   // Supabase's client refreshes the token itself and reads its cached session —
-  // no network call unless the token actually needs refreshing.
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
+  // no network call unless the token actually needs refreshing. supabase is null
+  // until SUPABASE_ANON_KEY is set, which just means no token — public endpoints
+  // still work.
+  const token = supabase ? (await supabase.auth.getSession()).data.session?.access_token : undefined;
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
