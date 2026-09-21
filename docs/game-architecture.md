@@ -70,12 +70,22 @@ Skia 캔버스에 렌더 (아직 placeholder 원 — 강아지 스프라이트 �
 water/grass/reeds 애니메이션, 깊이 정렬된 props, 플레이어 스프라이트(걷기 애니메이션 + 좌우 반전 —
 방향별 아트가 없어서 미러링으로 대체), **실제 배포 서버(`https://shelter-connect-dev.onrender.com`)에서
 route params로 받은 shelterId의 강아지+행동 설정을 fetch**해서 그 값으로 자율 행동하는 강아지들
-(placeholder 원, 스프라이트 없음) — 로딩/에러 배너 있음(Render 무료 플랜 슬립 시 최대 1분 대기 가능).
+— 로딩/에러 배너 있음(Render 무료 플랜 슬립 시 최대 1분 대기 가능).
 **보호소 선택 화면(`src/modules/dog/ShelterListScreen.tsx`)**이 Home으로 붙어서 `GET /v1/shelters` 목록을
 보여주고 고른 보호소의 shelterId를 Game 화면에 넘김 — 단, 맵 에셋은 여전히 sunny-meadow 1개뿐이라 어떤
 보호소를 골라도 같은 맵이 뜸(`mapKey` 매핑 확정 전까지는 의도된 동작).
-아직 안 한 것: 강아지 캐릭터 스프라이트, 공놀이(ballPlay.ts), 강아지-props 깊이 정렬(지금은 props보다
-위 레이어), 대화 진입 흐름.
+
+**강아지 스프라이트(`src/modules/game/core/assets/dog/dogWalkAtlas.ts`)**: 자리표시자 원 대신
+실제 도트 강아지가 걷는다. 에셋은 백엔드팀 레포(`HANN-Creator/shelter-connect`)의 자체 프로토타입
+(`work/mobile-concept/make-dog-walks.py`)이 코드로 그린 PNG — 사진이나 AI 생성이 아니라 파이썬
+PIL 스크립트가 좌표로 직접 그린 정적 이미지(CREDITS.md 확인 완료, 같은 서비스 팀 자산이라 재사용 무리 없음).
+36×36px, 3개 고정 정체성(bori/dubu/bami) × 3방향(정면/측면/후면) × 8프레임 걷기 + idle bounce 1행.
+`dogFacingRef`가 각 강아지의 `target` 벡터로 방향·좌우반전을 추적하고, WALK/RUN/BACK_OFF일 때만 걷기
+행을 쓰고 그 외엔 idle bounce 행을 쓴다. **실제 `avatarKey`(bomi/dubu/kongi)와 정확히 매칭되지 않음**
+— `dubu`만 우연히 겹침, 나머지는 `i % 3`으로 그냥 순환 배정. 그래픽 담당자가 실제 강아지별 아트를
+확정하면 `avatarKey → 스프라이트` 매핑으로 교체.
+
+아직 안 한 것: 공놀이(ballPlay.ts), 강아지-props 깊이 정렬(지금은 props보다 위 레이어), 대화 진입 흐름.
 
 ## 대화 AI
 이동/행동 시스템과 달리 대화 부분에만 실제 LLM(GPT-5.6-luna) 호출 — 관찰 기록 기반 grounded chat.
@@ -83,6 +93,6 @@ route params로 받은 shelterId의 강아지+행동 설정을 fetch**해서 그
 호출 불가. 연동은 [docs/api-conventions.md](./api-conventions.md) 참고.
 
 ## (확인 필요)
-- 강아지 캐릭터 스프라이트시트 프레임 크기/배치 — 맵 에셋은 확보됐지만 강아지 캐릭터는 아직 없음
+- 실제 강아지별 스프라이트 (`avatarKey` ↔ 아트 매핑) — 지금은 프로토타입 자산 3종을 인덱스로 순환 배정한 자리표시자
 - `speedTilesPerSecond` 등 "타일" 단위 ↔ 맵 픽셀 환산값 (현재 24 map-units/tile로 임의 가정)
 - `mapKey`("sunny") ↔ FE 맵 폴더명 매핑 (woodland-trail/lakeside-retreat 연결 전까지는 불필요)

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useRoute, type RouteProp } from '@react-navigation/native';
-import { Canvas, Circle, FilterMode, Image as SkiaImage, useImage } from '@shopify/react-native-skia';
+import { Canvas, FilterMode, Image as SkiaImage, useImage } from '@shopify/react-native-skia';
 import { groundImage, mapLayout, propImages, reedsSheet, grassSheet, waterFullMapFrames } from './core/assets/maps/sunnyMeadow';
 import {
   PLAYER_FRAME_SIZE,
@@ -9,6 +9,14 @@ import {
   PLAYER_WALK_ROW,
   playerWalkSheet,
 } from './core/assets/character/playerWalk';
+import {
+  DOG_FRAME_SIZE,
+  DOG_IDENTITY_COUNT,
+  DogDirection,
+  dogIdleRow,
+  dogWalkAtlas,
+  dogWalkRow,
+} from './core/assets/dog/dogWalkAtlas';
 import { usePropImages } from './core/assets/usePropImages';
 import { SpriteFrame } from './core/entities/SpriteFrame';
 import { createDogAgent, tickDog, type DogAgent } from './core/systems/dogStateMachine';
@@ -17,10 +25,7 @@ import { Joystick } from './input/Joystick';
 import { useShelterDogs, type DogWithBehavior } from '../dog/hooks/useShelterDogs';
 import type { RootStackParamList } from '../../app/navigation';
 
-const DOG_COLORS = ['#e0a458', '#8a6d3b', '#5a3825', '#c9c9c9', '#f0ead6', '#b5651d'];
-
-const DOG_DISPLAY_RADIUS = 9;
-const DOG_TAIL_WAG_RADIUS = 12;
+const DOG_DISPLAY_SIZE = 30;
 // Pixel art, nearest-neighbor only — no blur from bilinear interpolation on upscale.
 const NEAREST_SAMPLING = { filter: FilterMode.Nearest };
 
@@ -47,6 +52,30 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+interface DogFacing {
+  direction: DogDirection;
+  flipX: boolean;
+}
+
+const DEFAULT_DOG_FACING: DogFacing = { direction: DogDirection.FRONT, flipX: false };
+
+// Heading toward the dog's current target — ambiguous/idle ticks (no target, or
+// barely moving) keep the last facing instead of snapping back to front.
+function nextDogFacing(agent: DogAgent, previous: DogFacing): DogFacing {
+  if (!agent.target) {
+    return previous;
+  }
+  const dx = agent.target.x - agent.x;
+  const dy = agent.target.y - agent.y;
+  if (Math.abs(dx) > Math.abs(dy) * 1.2) {
+    return { direction: DogDirection.SIDE, flipX: dx < 0 };
+  }
+  if (Math.abs(dy) > Math.abs(dx) * 1.2) {
+    return { direction: dy > 0 ? DogDirection.FRONT : DogDirection.REAR, flipX: previous.flipX };
+  }
+  return previous;
+}
+
 // ponytail: JS-thread requestAnimationFrame loop, not a Reanimated UI-thread worklet —
 // simplest thing that works for one moving entity. Move to useFrameCallback if frame
 // drops show up once more entities are added.
@@ -56,6 +85,7 @@ export function GameScreen() {
   const grass = useImage(grassSheet);
   const reeds = useImage(reedsSheet);
   const playerSheet = useImage(playerWalkSheet);
+  const dogSheet = useImage(dogWalkAtlas);
   const props = usePropImages(propImages);
   // Fixed-size array from a module constant — same reasoning as usePropImages.
   const waterFrames = [
@@ -84,6 +114,7 @@ export function GameScreen() {
   const facingLeft = useRef(false);
   const direction = useRef({ dx: 0, dy: 0 });
   const playerPosRef = useRef(mapLayout.spawn);
+  const dogFacingRef = useRef<DogFacing[]>([]);
 
   // Spawn one dog per slot once the shelter's dogs + behavior settings arrive.
   useEffect(() => {
@@ -131,8 +162,8 @@ export function GameScreen() {
         setPlayer(moved);
       }
 
-      setDogs(prevDogs =>
-        prevDogs.map((agent, i) =>
+      setDogs(prevDogs => {
+        const nextDogs = prevDogs.map((agent, i) =>
           dogMeta[i]
             ? tickDog(
                 agent,
@@ -143,8 +174,12 @@ export function GameScreen() {
                 mapLayout.obstacles,
               )
             : agent,
-        ),
-      );
+        );
+        dogFacingRef.current = nextDogs.map((agent, i) =>
+          nextDogFacing(agent, dogFacingRef.current[i] ?? DEFAULT_DOG_FACING),
+        );
+        return nextDogs;
+      });
 
       // Water/grass/reeds animate on the 250ms environment clock.
       animAccumulator += dt * 1000;
@@ -258,15 +293,25 @@ export function GameScreen() {
               />
             );
           })}
-          {dogs.map((dog, i) => (
-            <Circle
-              key={dogMeta[i]?.id ?? i}
-              cx={toScreenX(dog.x)}
-              cy={toScreenY(dog.y)}
-              r={(dog.state === 'TAIL_WAG' ? DOG_TAIL_WAG_RADIUS : DOG_DISPLAY_RADIUS) * scale}
-              color={DOG_COLORS[i % DOG_COLORS.length]}
-            />
-          ))}
+          {dogSheet && dogs.map((dog, i) => {
+            const identity = i % DOG_IDENTITY_COUNT;
+            const moving = dog.state === 'WALK' || dog.state === 'RUN' || dog.state === 'BACK_OFF';
+            const facing = dogFacingRef.current[i] ?? DEFAULT_DOG_FACING;
+            const row = moving ? dogWalkRow(identity, facing.direction) : dogIdleRow(identity);
+            return (
+              <SpriteFrame
+                key={dogMeta[i]?.id ?? i}
+                sheet={dogSheet}
+                frameSize={DOG_FRAME_SIZE}
+                col={animFrame}
+                row={row}
+                x={toScreenX(dog.x) - (DOG_DISPLAY_SIZE * scale) / 2}
+                y={toScreenY(dog.y) - (DOG_DISPLAY_SIZE * scale) / 2}
+                size={DOG_DISPLAY_SIZE * scale}
+                flipX={facing.flipX}
+              />
+            );
+          })}
           {playerSheet && (
             <SpriteFrame
               sheet={playerSheet}
