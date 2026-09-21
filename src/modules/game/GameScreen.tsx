@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
-import { Canvas, Image as SkiaImage, useImage } from '@shopify/react-native-skia';
+import { Canvas, Circle, Image as SkiaImage, useImage } from '@shopify/react-native-skia';
 import { groundImage, mapLayout, propImages, reedsSheet, grassSheet, waterFullMapFrames } from './core/assets/maps/sunnyMeadow';
 import {
   PLAYER_FRAME_SIZE,
@@ -8,10 +8,15 @@ import {
   PLAYER_WALK_ROW,
   playerWalkSheet,
 } from './core/assets/character/playerWalk';
+import { sampleDogs } from './core/entities/sampleDogs';
 import { usePropImages } from './core/assets/usePropImages';
 import { SpriteFrame } from './core/entities/SpriteFrame';
+import { createDogAgent, tickDog, type DogAgent } from './core/systems/dogStateMachine';
 import { stepMovement } from './core/systems/movement';
 import { Joystick } from './input/Joystick';
+
+const DOG_DISPLAY_RADIUS = 9;
+const DOG_TAIL_WAG_RADIUS = 12;
 
 const PLAYER_RADIUS = 10;
 const PLAYER_DISPLAY_SIZE = 44;
@@ -62,11 +67,18 @@ export function GameScreen() {
   const visibleMapUnitsY = viewportHeight / scale;
 
   const [player, setPlayer] = useState(mapLayout.spawn);
+  const [dogs, setDogs] = useState<DogAgent[]>(() =>
+    sampleDogs.map(dog => {
+      const slot = mapLayout.slots[dog.slotIndex];
+      return createDogAgent(slot.x, slot.y);
+    }),
+  );
   const [animFrame, setAnimFrame] = useState(0);
   const [playerAnimStep, setPlayerAnimStep] = useState(0);
   const isMoving = useRef(false);
   const facingLeft = useRef(false);
   const direction = useRef({ dx: 0, dy: 0 });
+  const playerPosRef = useRef(mapLayout.spawn);
 
   useEffect(() => {
     let raf: number;
@@ -86,20 +98,33 @@ export function GameScreen() {
       }
       if (isMoving.current) {
         const speed = Math.hypot(dx, dy) > 0.8 ? PLAYER_SPEED * RUN_MULTIPLIER : PLAYER_SPEED;
-        setPlayer(prev =>
-          stepMovement({
-            x: prev.x,
-            y: prev.y,
-            dx,
-            dy,
-            speed,
-            dt,
-            radius: PLAYER_RADIUS,
-            bounds: mapLayout.bounds,
-            obstacles: mapLayout.obstacles,
-          }),
-        );
+        const moved = stepMovement({
+          x: playerPosRef.current.x,
+          y: playerPosRef.current.y,
+          dx,
+          dy,
+          speed,
+          dt,
+          radius: PLAYER_RADIUS,
+          bounds: mapLayout.bounds,
+          obstacles: mapLayout.obstacles,
+        });
+        playerPosRef.current = moved;
+        setPlayer(moved);
       }
+
+      setDogs(prevDogs =>
+        prevDogs.map((agent, i) =>
+          tickDog(
+            agent,
+            sampleDogs[i].personality,
+            dt,
+            playerPosRef.current,
+            mapLayout.bounds,
+            mapLayout.obstacles,
+          ),
+        ),
+      );
 
       // Water/grass/reeds animate on the 250ms environment clock.
       animAccumulator += dt * 1000;
@@ -210,6 +235,15 @@ export function GameScreen() {
               />
             );
           })}
+          {dogs.map((dog, i) => (
+            <Circle
+              key={sampleDogs[i].id}
+              cx={toScreenX(dog.x)}
+              cy={toScreenY(dog.y)}
+              r={(dog.state === 'TAIL_WAG' ? DOG_TAIL_WAG_RADIUS : DOG_DISPLAY_RADIUS) * scale}
+              color={sampleDogs[i].color}
+            />
+          ))}
           {playerSheet && (
             <SpriteFrame
               sheet={playerSheet}
