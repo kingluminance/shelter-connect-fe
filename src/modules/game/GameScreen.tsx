@@ -59,6 +59,7 @@ export function GameScreen() {
   const [player, setPlayer] = useState(mapLayout.spawn);
   const [animFrame, setAnimFrame] = useState(0);
   const isMoving = useRef(false);
+  const facingLeft = useRef(false);
   const direction = useRef({ dx: 0, dy: 0 });
 
   useEffect(() => {
@@ -73,6 +74,9 @@ export function GameScreen() {
 
       const { dx, dy } = direction.current;
       isMoving.current = dx !== 0 || dy !== 0;
+      if (dx !== 0) {
+        facingLeft.current = dx < 0;
+      }
       if (isMoving.current) {
         const speed = Math.hypot(dx, dy) > 0.8 ? PLAYER_SPEED * RUN_MULTIPLIER : PLAYER_SPEED;
         setPlayer(prev =>
@@ -197,6 +201,7 @@ export function GameScreen() {
               x={toScreenX(player.x) - (PLAYER_DISPLAY_SIZE * scale) / 2}
               y={toScreenY(player.y) - (PLAYER_DISPLAY_SIZE * scale) / 2}
               size={PLAYER_DISPLAY_SIZE * scale}
+              flipX={facingLeft.current}
             />
           )}
         </Canvas>
