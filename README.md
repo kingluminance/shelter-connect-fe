@@ -7,13 +7,15 @@
 - React Native 0.87 (bare CLI, TypeScript) — Android + iOS
 - `@shopify/react-native-skia` + `react-native-reanimated` v4 — 운동장 게임 화면
 - `@react-navigation/native` (native-stack)
-- REST API (Spring Boot 백엔드, 별도 레포) — `src/shared/lib/apiClient.ts`
+- REST API — 실제 배포된 [Spring Boot 백엔드](https://github.com/HANN-Creator/shelter-connect)
+  (`https://shelter-connect-dev.onrender.com`) — `src/shared/lib/apiClient.ts`
+- 로그인은 `@supabase/supabase-js`로 FE가 직접 처리 — `src/shared/lib/supabase.ts` ([docs/auth.md](./docs/auth.md))
 
 ## 시작하기
 
 ```sh
 npm install
-cp .env.example .env   # API_BASE_URL을 로컬 백엔드 주소로 설정
+cp .env.example .env   # SUPABASE_ANON_KEY는 백엔드팀에게 받아서 채워야 함 (API_BASE_URL은 기본값이 배포 서버)
 ```
 
 ### iOS

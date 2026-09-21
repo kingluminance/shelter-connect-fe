@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useRoute, type RouteProp } from '@react-navigation/native';
 import { Canvas, Circle, FilterMode, Image as SkiaImage, useImage } from '@shopify/react-native-skia';
 import { groundImage, mapLayout, propImages, reedsSheet, grassSheet, waterFullMapFrames } from './core/assets/maps/sunnyMeadow';
 import {
@@ -8,12 +9,15 @@ import {
   PLAYER_WALK_ROW,
   playerWalkSheet,
 } from './core/assets/character/playerWalk';
-import { sampleDogs } from './core/entities/sampleDogs';
 import { usePropImages } from './core/assets/usePropImages';
 import { SpriteFrame } from './core/entities/SpriteFrame';
 import { createDogAgent, tickDog, type DogAgent } from './core/systems/dogStateMachine';
 import { stepMovement } from './core/systems/movement';
 import { Joystick } from './input/Joystick';
+import { useShelterDogs, type DogWithBehavior } from '../dog/hooks/useShelterDogs';
+import type { RootStackParamList } from '../../app/navigation';
+
+const DOG_COLORS = ['#e0a458', '#8a6d3b', '#5a3825', '#c9c9c9', '#f0ead6', '#b5651d'];
 
 const DOG_DISPLAY_RADIUS = 9;
 const DOG_TAIL_WAG_RADIUS = 12;
@@ -45,8 +49,9 @@ function clamp(value: number, min: number, max: number) {
 
 // ponytail: JS-thread requestAnimationFrame loop, not a Reanimated UI-thread worklet —
 // simplest thing that works for one moving entity. Move to useFrameCallback if frame
-// drops show up once the dog AI/multiple entities are added.
+// drops show up once more entities are added.
 export function GameScreen() {
+  const { params } = useRoute<RouteProp<RootStackParamList, 'Game'>>();
   const ground = useImage(groundImage);
   const grass = useImage(grassSheet);
   const reeds = useImage(reedsSheet);
@@ -64,23 +69,34 @@ export function GameScreen() {
     useImage(waterFullMapFrames[7]),
   ];
 
+  const shelterDogs = useShelterDogs(params.shelterId);
+
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const scale = viewportWidth / VIEWPORT_MAP_UNITS;
   const visibleMapUnitsY = viewportHeight / scale;
 
   const [player, setPlayer] = useState(mapLayout.spawn);
-  const [dogs, setDogs] = useState<DogAgent[]>(() =>
-    sampleDogs.map(dog => {
-      const slot = mapLayout.slots[dog.slotIndex];
-      return createDogAgent(slot.x, slot.y);
-    }),
-  );
+  const [dogs, setDogs] = useState<DogAgent[]>([]);
+  const [dogMeta, setDogMeta] = useState<DogWithBehavior[]>([]);
   const [animFrame, setAnimFrame] = useState(0);
   const [playerAnimStep, setPlayerAnimStep] = useState(0);
   const isMoving = useRef(false);
   const facingLeft = useRef(false);
   const direction = useRef({ dx: 0, dy: 0 });
   const playerPosRef = useRef(mapLayout.spawn);
+
+  // Spawn one dog per slot once the shelter's dogs + behavior settings arrive.
+  useEffect(() => {
+    if (shelterDogs.status === 'ready') {
+      setDogMeta(shelterDogs.dogs);
+      setDogs(
+        shelterDogs.dogs.map((_, i) => {
+          const slot = mapLayout.slots[i % mapLayout.slots.length];
+          return createDogAgent(slot.x, slot.y);
+        }),
+      );
+    }
+  }, [shelterDogs]);
 
   useEffect(() => {
     let raf: number;
@@ -117,14 +133,16 @@ export function GameScreen() {
 
       setDogs(prevDogs =>
         prevDogs.map((agent, i) =>
-          tickDog(
-            agent,
-            sampleDogs[i].personality,
-            dt,
-            playerPosRef.current,
-            mapLayout.bounds,
-            mapLayout.obstacles,
-          ),
+          dogMeta[i]
+            ? tickDog(
+                agent,
+                dogMeta[i].behavior.settings,
+                dt,
+                playerPosRef.current,
+                mapLayout.bounds,
+                mapLayout.obstacles,
+              )
+            : agent,
         ),
       );
 
@@ -151,7 +169,7 @@ export function GameScreen() {
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [dogMeta]);
 
   // Camera follows the player, clamped so its view never shows past the map edge.
   const cameraLeft = clamp(
@@ -242,11 +260,11 @@ export function GameScreen() {
           })}
           {dogs.map((dog, i) => (
             <Circle
-              key={sampleDogs[i].id}
+              key={dogMeta[i]?.id ?? i}
               cx={toScreenX(dog.x)}
               cy={toScreenY(dog.y)}
               r={(dog.state === 'TAIL_WAG' ? DOG_TAIL_WAG_RADIUS : DOG_DISPLAY_RADIUS) * scale}
-              color={sampleDogs[i].color}
+              color={DOG_COLORS[i % DOG_COLORS.length]}
             />
           ))}
           {playerSheet && (
@@ -265,6 +283,17 @@ export function GameScreen() {
         <View style={styles.joystick}>
           <Joystick onChange={(dx, dy) => { direction.current = { dx, dy }; }} />
         </View>
+        {shelterDogs.status === 'loading' && (
+          <View style={styles.statusBanner}>
+            <ActivityIndicator color="#fff" />
+            <Text style={styles.statusText}>강아지 불러오는 중… (서버가 잠들어 있으면 최대 1분)</Text>
+          </View>
+        )}
+        {shelterDogs.status === 'error' && (
+          <View style={styles.statusBanner}>
+            <Text style={styles.statusText}>강아지를 못 불러왔어요: {shelterDogs.message}</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -279,5 +308,21 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     bottom: 16,
+  },
+  statusBanner: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 8,
+    padding: 10,
+  },
+  statusText: {
+    color: '#fff',
+    flexShrink: 1,
   },
 });

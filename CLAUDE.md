@@ -4,8 +4,11 @@
 
 ## 프로젝트
 보호소 커넥트 — 도트 강아지와 대화하며 알아가는 입양 서비스, React Native 프론트엔드.
-백엔드(Spring Boot)는 별도 레포. 이 레포는 REST API만 호출하고 Supabase에 직접 연결하지 않는다
-([docs/api-conventions.md](./docs/api-conventions.md)).
+백엔드(Spring Boot)는 [HANN-Creator/shelter-connect](https://github.com/HANN-Creator/shelter-connect)에
+실제 구현·배포됨(`https://shelter-connect-dev.onrender.com`, Render 무료 — 15분 미사용 시 슬립, 첫 요청
+최대 1분). 이 레포는 REST API만 호출하고 Supabase DB에 직접 연결하지 않는다 — **단, 로그인은 예외로
+FE가 Supabase Auth SDK를 직접 씀** ([docs/api-conventions.md](./docs/api-conventions.md),
+[docs/auth.md](./docs/auth.md)).
 
 ## 명령어
 ```sh
@@ -19,9 +22,13 @@ cd ios && pod install   # 네이티브 의존성 변경 후
 ```
 
 ## 아키텍처 규칙 ([docs/project-overview.md](./docs/project-overview.md) 상세)
-- `src/modules/*` 도메인끼리 직접 참조 금지 (필요시 타입만)
+- `src/modules/*` 도메인의 **내부 구현**끼리 직접 참조 금지 — 단, 화면(`GameScreen.tsx`처럼 core가 아닌
+  최상위 컴포넌트)이 다른 도메인의 **공개 API/hooks**를 가져다 쓰는 건 허용(예: `modules/game/GameScreen.tsx`가
+  `modules/dog/hooks/useShelterDogs.ts` 사용). 화면은 여러 도메인을 조합하는 지점이라 그럼
 - `src/shared`는 어디서나 참조 가능
-- `src/modules/game/core`는 RN 전용 API(`Platform.OS`, `Dimensions` 등) 직접 호출 금지, `modules/dog`의 타입만 참조 가능 — 웹 이식성 유지
+- `src/modules/game/core`는 RN 전용 API(`Platform.OS`, `Dimensions` 등) 직접 호출 금지, `modules/dog`의
+  타입만 참조 가능(함수·hooks는 안 됨) — 웹 이식성 유지. `dogStateMachine.ts`가 `modules/dog/types.ts`의
+  `DogBehaviorSettings` 타입만 import하는 게 그 예
 - 이미지는 Skia `useImage`로만 로드 (`Image`/`require()` 직접 사용 금지)
 
 ## 브랜치 규칙
@@ -56,5 +63,5 @@ fix: 강아지 상태머신 전환 확률 버그 수정
   요구하므로 당장 막히진 않음. reanimated가 업데이트되면 재확인.
 
 ## 확인 필요한 미결 사항
-[docs/project-overview.md](./docs/project-overview.md) 하단 "확인 필요" 섹션 참고 — 성격 파라미터 스키마,
-스프라이트 규격, 입양 서류 플로우 등 백엔드/그래픽 담당자 확인 대기 중.
+[docs/project-overview.md](./docs/project-overview.md) 하단 "확인 필요" 섹션 참고 — 스프라이트 규격,
+타일 단위 환산, `SUPABASE_ANON_KEY` 등 백엔드/그래픽 담당자 확인 대기 중.
