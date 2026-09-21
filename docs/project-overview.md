@@ -76,7 +76,6 @@ src/
 - 강아지 캐릭터 스프라이트시트 규격 (프레임 크기/수/배치) — 그래픽 담당자 조율
 - "타일" 단위 ↔ 맵 픽셀 환산값, `mapKey` ↔ FE 맵 폴더 매핑
 - 입양 서류 플로우 상세, `SUPABASE_ANON_KEY` 값 (백엔드팀 확인 필요)
-- 보호소 선택 화면 (지금은 온기 보호소 shelterId 하드코딩)
 
 ~~맵 에셋 형태~~ → 확정됨: 낱개 타일 PNG + JSON 배치 (Tiled 아님). 3종 맵 에셋 확보 완료,
 [game-architecture.md](./game-architecture.md) 참고.

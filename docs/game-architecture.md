@@ -69,10 +69,13 @@ Skia 캔버스에 렌더 (아직 placeholder 원 — 강아지 스프라이트 �
 **GameScreen 현재 상태(`src/modules/game/GameScreen.tsx`)**: 화면 전체를 채우는 플레이어 추적 카메라,
 water/grass/reeds 애니메이션, 깊이 정렬된 props, 플레이어 스프라이트(걷기 애니메이션 + 좌우 반전 —
 방향별 아트가 없어서 미러링으로 대체), **실제 배포 서버(`https://shelter-connect-dev.onrender.com`)에서
-온기 보호소(하드코딩된 shelterId)의 강아지+행동 설정을 fetch**해서 그 값으로 자율 행동하는 강아지들
+route params로 받은 shelterId의 강아지+행동 설정을 fetch**해서 그 값으로 자율 행동하는 강아지들
 (placeholder 원, 스프라이트 없음) — 로딩/에러 배너 있음(Render 무료 플랜 슬립 시 최대 1분 대기 가능).
+**보호소 선택 화면(`src/modules/dog/ShelterListScreen.tsx`)**이 Home으로 붙어서 `GET /v1/shelters` 목록을
+보여주고 고른 보호소의 shelterId를 Game 화면에 넘김 — 단, 맵 에셋은 여전히 sunny-meadow 1개뿐이라 어떤
+보호소를 골라도 같은 맵이 뜸(`mapKey` 매핑 확정 전까지는 의도된 동작).
 아직 안 한 것: 강아지 캐릭터 스프라이트, 공놀이(ballPlay.ts), 강아지-props 깊이 정렬(지금은 props보다
-위 레이어), 보호소 선택 화면(지금은 온기 보호소 고정), 대화 진입 흐름.
+위 레이어), 대화 진입 흐름.
 
 ## 대화 AI
 이동/행동 시스템과 달리 대화 부분에만 실제 LLM(GPT-5.6-luna) 호출 — 관찰 기록 기반 grounded chat.
@@ -82,4 +85,4 @@ water/grass/reeds 애니메이션, 깊이 정렬된 props, 플레이어 스프�
 ## (확인 필요)
 - 강아지 캐릭터 스프라이트시트 프레임 크기/배치 — 맵 에셋은 확보됐지만 강아지 캐릭터는 아직 없음
 - `speedTilesPerSecond` 등 "타일" 단위 ↔ 맵 픽셀 환산값 (현재 24 map-units/tile로 임의 가정)
-- `mapKey`("sunny") ↔ FE 맵 폴더명 매핑, 강아지 목록 조회용 shelterId 하드코딩 제거(보호소 선택 화면 필요)
+- `mapKey`("sunny") ↔ FE 맵 폴더명 매핑 (woodland-trail/lakeside-retreat 연결 전까지는 불필요)
