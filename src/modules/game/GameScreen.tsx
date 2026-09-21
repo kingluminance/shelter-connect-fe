@@ -14,7 +14,7 @@ import { stepMovement } from './core/systems/movement';
 import { Joystick } from './input/Joystick';
 
 const PLAYER_RADIUS = 10;
-const PLAYER_DISPLAY_SIZE = 28;
+const PLAYER_DISPLAY_SIZE = 44;
 const PLAYER_SPEED = 55; // px/s of map space
 const RUN_MULTIPLIER = 1.8;
 // How many map units are visible across the viewport's width — smaller = more zoomed in.
