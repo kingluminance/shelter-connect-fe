@@ -14,8 +14,8 @@ const RUN_MULTIPLIER = 1.8;
 // drops show up once the dog AI/multiple entities are added.
 export function GameScreen() {
   const ground = useImage(groundImage);
-  const { width: screenWidth } = useWindowDimensions();
-  const mapSize = Math.min(screenWidth, mapLayout.width);
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const mapSize = Math.min(screenWidth, screenHeight) * 0.92;
   const scale = mapSize / mapLayout.width;
 
   const [player, setPlayer] = useState(mapLayout.spawn);
@@ -56,14 +56,16 @@ export function GameScreen() {
 
   return (
     <View style={styles.container}>
-      <Canvas style={{ width: mapSize, height: mapSize }}>
-        {ground && (
-          <SkiaImage image={ground} x={0} y={0} width={mapSize} height={mapSize} fit="fill" />
-        )}
-        <Circle cx={player.x * scale} cy={player.y * scale} r={PLAYER_RADIUS * scale} color="#4a90d9" />
-      </Canvas>
-      <View style={styles.joystick}>
-        <Joystick onChange={(dx, dy) => { direction.current = { dx, dy }; }} />
+      <View style={{ width: mapSize, height: mapSize }}>
+        <Canvas style={{ width: mapSize, height: mapSize }}>
+          {ground && (
+            <SkiaImage image={ground} x={0} y={0} width={mapSize} height={mapSize} fit="fill" />
+          )}
+          <Circle cx={player.x * scale} cy={player.y * scale} r={PLAYER_RADIUS * scale} color="#4a90d9" />
+        </Canvas>
+        <View style={styles.joystick}>
+          <Joystick onChange={(dx, dy) => { direction.current = { dx, dy }; }} />
+        </View>
       </View>
     </View>
   );
@@ -73,11 +75,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#000',
   },
   joystick: {
     position: 'absolute',
-    left: 24,
-    bottom: 40,
+    left: 16,
+    bottom: 16,
   },
 });
