@@ -56,13 +56,23 @@ IDLE/WALK
 - 모바일: 탭 버튼으로 공 던지기 (PC 프로토타입의 E키 대응)
 
 ## 맵
-이번 버전 구현 맵은 `sunny-yard` (햇살 운동장) 1개만. 640×640px, nearest 픽셀 스케일링,
-타일 애니메이션 8프레임/250ms(물/풀/갈대). 맵 3종(숲속 산책길, 물가 쉼터)은 나중 버전.
+3종 맵 에셋 확보 완료 (`src/modules/game/core/assets/maps/`) — 낱개 타일 PNG + JSON 배치 방식
+(Tiled 아님). 각 맵 폴더: `map/ground.png`(바닥 전체), `map/layout.json`(bounds/spawn/강아지 자리
+6개/장애물 rect/오브젝트 배치), `animations/{water,grass,reeds}`(8프레임/250ms 시트),
+`props/*.png`(개별 사물 투명 PNG). 640×640px, nearest 스케일링 확인됨.
+맵별 `require()` 매핑은 `src/modules/game/core/assets/maps/<name>.ts` — 손으로 고치지 말고
+`scripts/gen-map-assets.mjs`로 재생성 (Metro가 `require()`를 정적으로 분석해야 해서 동적 경로 불가).
+
+**이번 버전 구현 대상은 여전히 `sunny-meadow`(햇살 운동장) 1개.** 나머지 두 맵(`woodland-trail`,
+`lakeside-retreat`)은 에셋만 들어와 있고 화면 연결은 나중 버전.
+
+**GameScreen 현재 상태(`src/modules/game/GameScreen.tsx`)**: `ground.png` 정적 렌더 + 조이스틱으로
+움직이는 원(placeholder) 플레이어. `layout.json`의 bounds/obstacles로 충돌 처리(`movement.ts`).
+아직 안 한 것: water/grass/reeds 애니메이션 재생, props 레이어 렌더(깊이 정렬), 강아지 캐릭터/상태머신.
 
 ## 대화 AI
 이동/행동 시스템과 달리 대화 부분에만 실제 LLM(GPT-5.6-luna) 호출 — 관찰 기록 기반 grounded chat.
 실시간 이동에는 LLM 미사용(지연/비용). 연동은 `POST /chat/{dogId}` (docs/api-conventions.md).
 
 ## (확인 필요)
-- 스프라이트시트 프레임 크기/배치 — 그래픽 담당자와 조율
-- 맵 에셋을 낱개 타일 PNG로 받을지, 타일셋(Tiled)으로 받을지
+- 강아지 캐릭터 스프라이트시트 프레임 크기/배치 — 맵 에셋은 확보됐지만 강아지 캐릭터는 아직 없음
