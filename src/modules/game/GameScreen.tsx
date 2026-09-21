@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import { Canvas, FilterMode, Image as SkiaImage, useImage } from '@shopify/react-native-skia';
@@ -13,6 +13,7 @@ import {
   DOG_FRAME_SIZE,
   DOG_IDENTITY_COUNT,
   DogDirection,
+  dogIdleColumn,
   dogIdleRow,
   dogWalkAtlas,
   dogWalkRow,
@@ -220,12 +221,83 @@ export function GameScreen() {
   const toScreenX = (mapX: number) => (mapX - cameraLeft) * scale;
   const toScreenY = (mapY: number) => (mapY - cameraTop) * scale;
 
-  const sortedObjects = useMemo(
-    () => [...mapLayout.objects].sort((a, b) => a.depth - b.depth),
-    [],
-  );
-
   const playerFrame = isMoving.current ? PLAYER_WALK_SEQUENCE[playerAnimStep] : 0;
+
+  // Painter's algorithm: props, dogs and the player all plant on the same ground
+  // plane, so they have to be sorted into one list by map-Y (mapLayout.objects'
+  // precomputed `depth` is each prop's ground-contact point, comparable to the
+  // player/dogs' own y) rather than drawn in separate fixed-order blocks — otherwise
+  // an entity above a tall prop still paints on top of it.
+  const sceneEntities: { depth: number; node: ReactElement }[] = [];
+
+  for (const object of mapLayout.objects) {
+    const image = props[object.asset];
+    if (!image) {
+      continue;
+    }
+    sceneEntities.push({
+      depth: object.depth,
+      node: (
+        <SkiaImage
+          key={object.id}
+          image={image}
+          x={toScreenX(object.x)}
+          y={toScreenY(object.y)}
+          width={object.w * scale}
+          height={object.h * scale}
+          fit="fill"
+          sampling={NEAREST_SAMPLING}
+        />
+      ),
+    });
+  }
+
+  if (dogSheet) {
+    dogs.forEach((dog, i) => {
+      const identity = i % DOG_IDENTITY_COUNT;
+      const moving = dog.state === 'WALK' || dog.state === 'RUN' || dog.state === 'BACK_OFF';
+      const facing = dogFacingRef.current[i] ?? DEFAULT_DOG_FACING;
+      const row = moving ? dogWalkRow(identity, facing.direction) : dogIdleRow(identity);
+      const col = moving ? animFrame : dogIdleColumn(dog.state, animFrame);
+      sceneEntities.push({
+        depth: dog.y,
+        node: (
+          <SpriteFrame
+            key={dogMeta[i]?.id ?? i}
+            sheet={dogSheet}
+            frameSize={DOG_FRAME_SIZE}
+            col={col}
+            row={row}
+            x={toScreenX(dog.x) - (DOG_DISPLAY_SIZE * scale) / 2}
+            y={toScreenY(dog.y) - (DOG_DISPLAY_SIZE * scale) / 2}
+            size={DOG_DISPLAY_SIZE * scale}
+            flipX={facing.flipX}
+          />
+        ),
+      });
+    });
+  }
+
+  if (playerSheet) {
+    sceneEntities.push({
+      depth: player.y,
+      node: (
+        <SpriteFrame
+          key="player"
+          sheet={playerSheet}
+          frameSize={PLAYER_FRAME_SIZE}
+          col={playerFrame % PLAYER_SHEET_COLS}
+          row={PLAYER_WALK_ROW}
+          x={toScreenX(player.x) - (PLAYER_DISPLAY_SIZE * scale) / 2}
+          y={toScreenY(player.y) - (PLAYER_DISPLAY_SIZE * scale) / 2}
+          size={PLAYER_DISPLAY_SIZE * scale}
+          flipX={facingLeft.current}
+        />
+      ),
+    });
+  }
+
+  sceneEntities.sort((a, b) => a.depth - b.depth);
 
   return (
     <View style={styles.container}>
@@ -275,55 +347,7 @@ export function GameScreen() {
               />
             );
           })}
-          {sortedObjects.map(object => {
-            const image = props[object.asset];
-            if (!image) {
-              return null;
-            }
-            return (
-              <SkiaImage
-                key={object.id}
-                image={image}
-                x={toScreenX(object.x)}
-                y={toScreenY(object.y)}
-                width={object.w * scale}
-                height={object.h * scale}
-                fit="fill"
-                sampling={NEAREST_SAMPLING}
-              />
-            );
-          })}
-          {dogSheet && dogs.map((dog, i) => {
-            const identity = i % DOG_IDENTITY_COUNT;
-            const moving = dog.state === 'WALK' || dog.state === 'RUN' || dog.state === 'BACK_OFF';
-            const facing = dogFacingRef.current[i] ?? DEFAULT_DOG_FACING;
-            const row = moving ? dogWalkRow(identity, facing.direction) : dogIdleRow(identity);
-            return (
-              <SpriteFrame
-                key={dogMeta[i]?.id ?? i}
-                sheet={dogSheet}
-                frameSize={DOG_FRAME_SIZE}
-                col={animFrame}
-                row={row}
-                x={toScreenX(dog.x) - (DOG_DISPLAY_SIZE * scale) / 2}
-                y={toScreenY(dog.y) - (DOG_DISPLAY_SIZE * scale) / 2}
-                size={DOG_DISPLAY_SIZE * scale}
-                flipX={facing.flipX}
-              />
-            );
-          })}
-          {playerSheet && (
-            <SpriteFrame
-              sheet={playerSheet}
-              frameSize={PLAYER_FRAME_SIZE}
-              col={playerFrame % PLAYER_SHEET_COLS}
-              row={PLAYER_WALK_ROW}
-              x={toScreenX(player.x) - (PLAYER_DISPLAY_SIZE * scale) / 2}
-              y={toScreenY(player.y) - (PLAYER_DISPLAY_SIZE * scale) / 2}
-              size={PLAYER_DISPLAY_SIZE * scale}
-              flipX={facingLeft.current}
-            />
-          )}
+          {sceneEntities.map(entity => entity.node)}
         </Canvas>
         <View style={styles.joystick}>
           <Joystick onChange={(dx, dy) => { direction.current = { dx, dy }; }} />

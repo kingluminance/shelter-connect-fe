@@ -24,3 +24,22 @@ export function dogWalkRow(identity: number, direction: DogDirection): number {
 export function dogIdleRow(identity: number): number {
   return DOG_IDENTITY_COUNT * 3 + (identity % DOG_IDENTITY_COUNT);
 }
+
+// No dedicated SIT/LIE_DOWN/SNIFF/TAIL_WAG art exists (only walk + one idle-bounce
+// row per identity) — these pick a column from that same idle row so the states read
+// differently anyway: SIT/LIE_DOWN hold still, SNIFF holds the head-down frame,
+// TAIL_WAG doubles the shared animation clock's step for a faster, excited bounce.
+// Swap for real per-state art once it exists.
+export function dogIdleColumn(state: string, animFrame: number): number {
+  switch (state) {
+    case 'SIT':
+    case 'LIE_DOWN':
+      return 0;
+    case 'SNIFF':
+      return Math.floor(DOG_WALK_FRAME_COUNT / 4);
+    case 'TAIL_WAG':
+      return (animFrame * 2) % DOG_WALK_FRAME_COUNT;
+    default:
+      return animFrame;
+  }
+}
