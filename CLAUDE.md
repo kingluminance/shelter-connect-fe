@@ -44,6 +44,12 @@ fix: 강아지 상태머신 전환 확률 버그 수정
 - game 모듈(`src/modules/game/core`) 변경 시 RN 전용 API 미사용 여부 리뷰에서 확인
 - 리뷰 없이 self-merge 지양 — 1인 개발이라도 CI(lint/typecheck) 통과는 머지 조건
 
+## 알려진 함정
+- **같은 style 객체 참조를 서로 다른 컴포넌트에 재사용하지 말 것** — 예: `const s = {flex:1}; <GestureHandlerRootView style={s}><View style={s}>`.
+  이 환경(RN 0.87 + Fabric + react-native-screens native-stack)에서 부모/자식이 동일 style
+  객체 참조를 공유하면 `<Text>`가 화면에 전혀 그려지지 않는(배경은 정상, 글자만 안 보이는)
+  버그가 재현됨. `StyleSheet.create`든 인라인 객체든 상관없이, 컴포넌트마다 별개의 객체를 쓸 것.
+
 ## 확인 필요한 미결 사항
 [docs/project-overview.md](./docs/project-overview.md) 하단 "확인 필요" 섹션 참고 — 성격 파라미터 스키마,
 스프라이트 규격, 입양 서류 플로우 등 백엔드/그래픽 담당자 확인 대기 중.
