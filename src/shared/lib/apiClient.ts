@@ -1,5 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '@env';
+import { supabase } from './supabase';
 
 // 보호소 커넥트 백엔드(Spring Boot) 계약: docs/api-conventions.md 참고
 export class ApiError extends Error {
@@ -13,25 +13,14 @@ export class ApiError extends Error {
   }
 }
 
-const AUTH_TOKEN_KEY = 'auth_token';
-
-export async function getAuthToken(): Promise<string | null> {
-  return AsyncStorage.getItem(AUTH_TOKEN_KEY);
-}
-
-export async function setAuthToken(token: string | null): Promise<void> {
-  if (token) {
-    await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
-  } else {
-    await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
-  }
-}
-
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = await getAuthToken();
+  // Supabase's client refreshes the token itself and reads its cached session —
+  // no network call unless the token actually needs refreshing.
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,

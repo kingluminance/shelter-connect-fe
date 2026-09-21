@@ -1,45 +1,45 @@
 import { type Bounds, stepMovement } from './movement';
+import type { DogActionKey, DogBehaviorSettings } from '../../../dog/types';
 
-export type DogState =
-  | 'IDLE'
-  | 'WALK'
-  | 'RUN'
-  | 'SNIFF'
-  | 'TAIL_WAG'
-  | 'BACK_OFF'
-  | 'SIT'
-  | 'LIE_DOWN';
+export type DogState = DogActionKey;
 
-export interface DogPersonality {
-  playfulness: number; // 0~1
-  sociability: number; // 0~1
-  energy: number; // 0~1
-  likesBall: boolean;
-}
+// ponytail: the backend's `speedTilesPerSecond`/`*Tiles` fields assume a "tile" unit
+// the map assets don't define anywhere — picked 24 map-units/tile (matches the env
+// animation frame size) as a working assumption. Confirm with backend/art before
+// this ships past a demo.
+const TILE_SIZE_MAP_UNITS = 24;
+
+const DOG_RADIUS = 8;
+const TARGET_REACHED_DIST = 4;
 
 export interface DogAgent {
   state: DogState;
   x: number;
   y: number;
   target: { x: number; y: number } | null;
-  stateElapsed: number;
-  stationaryElapsed: number;
-  decisionCooldown: number;
+  /** ms remaining in the current state (counts down; re-decide at 0). */
+  stateRemainingMs: number;
+  /** ms until each action becomes selectable again, keyed by action. */
+  cooldownUntilMs: Partial<Record<DogState, number>>;
+  /** total elapsed ms, used against cooldownUntilMs. */
+  clockMs: number;
+  /** ms left before a nearby-player reaction actually kicks in (reactionDelayMs). */
+  reactionPendingMs: number | null;
+  reactionTarget: 'TAIL_WAG' | 'BACK_OFF' | null;
 }
 
-const WALK_SPEED = 26;
-const RUN_SPEED = 55;
-const BACK_OFF_SPEED = 45;
-const DOG_RADIUS = 8;
-const PROXIMITY_NEAR = 28; // map units — player is "close"
-const SIT_AFTER_STATIONARY_S = 10;
-const DECISION_INTERVAL_S = 2.5;
-const TARGET_REACHED_DIST = 4;
-const SNIFF_DURATION_S = 2;
-const TAIL_WAG_MIN_S = 1.5;
-
 export function createDogAgent(x: number, y: number): DogAgent {
-  return { state: 'IDLE', x, y, target: null, stateElapsed: 0, stationaryElapsed: 0, decisionCooldown: 0 };
+  return {
+    state: 'IDLE',
+    x,
+    y,
+    target: null,
+    stateRemainingMs: 0,
+    cooldownUntilMs: {},
+    clockMs: 0,
+    reactionPendingMs: null,
+    reactionTarget: null,
+  };
 }
 
 function distance(ax: number, ay: number, bx: number, by: number): number {
@@ -54,112 +54,153 @@ function randomTargetWithin(bounds: Bounds, rng: () => number): { x: number; y: 
   };
 }
 
-/** Weighted pick of the next autonomous state, shaped by personality. */
-function pickNextState(personality: DogPersonality, rng: () => number): DogState {
-  const weights: Array<[DogState, number]> = [
-    ['IDLE', 0.2],
-    ['WALK', 0.3 + personality.energy * 0.3],
-    ['RUN', personality.energy > 0.4 ? personality.playfulness * 0.3 : 0],
-    ['SNIFF', 0.15],
-    ['SIT', (1 - personality.energy) * 0.2],
-  ];
-  const total = weights.reduce((sum, [, w]) => sum + w, 0);
+/**
+ * Weighted pick among autonomous actions (not on cooldown, weight > 0). Excludes
+ * TAIL_WAG/BACK_OFF — per docs/dog-behavior-api.md those are purely reactive
+ * (entered only through the player-proximity + reactionDelayMs path below), never
+ * autonomous wandering.
+ */
+function pickNextState(
+  settings: DogBehaviorSettings,
+  clockMs: number,
+  cooldownUntilMs: Partial<Record<DogState, number>>,
+  rng: () => number,
+): DogState {
+  const entries = (Object.entries(settings.actions) as [DogState, DogBehaviorSettings['actions'][DogState]][])
+    .filter(
+      ([state, action]) =>
+        state !== 'TAIL_WAG' &&
+        state !== 'BACK_OFF' &&
+        action.weight > 0 &&
+        (cooldownUntilMs[state] ?? 0) <= clockMs,
+    );
+
+  if (entries.length === 0) {
+    return 'IDLE'; // everything on cooldown or zeroed out — hold still rather than force a state its shelter disabled
+  }
+
+  const total = entries.reduce((sum, [, action]) => sum + action.weight, 0);
   let roll = rng() * total;
-  for (const [state, weight] of weights) {
-    roll -= weight;
+  for (const [state, action] of entries) {
+    roll -= action.weight;
     if (roll <= 0) {
       return state;
     }
   }
-  return 'IDLE';
+  return entries[entries.length - 1][0];
 }
 
-function setState(agent: DogAgent, state: DogState, target: DogAgent['target'] = null): DogAgent {
-  return { ...agent, state, target, stateElapsed: 0 };
+function enterState(
+  agent: DogAgent,
+  state: DogState,
+  settings: DogBehaviorSettings,
+  bounds: Bounds,
+  rng: () => number,
+): DogAgent {
+  const action = settings.actions[state];
+  const duration = action.minDurationMs + rng() * Math.max(0, action.maxDurationMs - action.minDurationMs);
+  const target = state === 'WALK' || state === 'RUN' ? randomTargetWithin(bounds, rng) : null;
+  return { ...agent, state, target, stateRemainingMs: duration };
 }
 
 /**
- * Advances one dog's behavior by dt seconds. Personality shapes weighted random
- * transitions; player proximity overrides them (sociable dogs wag their tail,
- * shy ones back away); standing still for 10s settles the dog into SIT.
+ * Advances one dog by dt seconds using the shelter-configured behavior settings
+ * (docs/dog-behavior-api.md): weighted random action selection bounded by each
+ * action's own min/max duration and post-use cooldown, plus a player-proximity
+ * override (BACK_OFF inside personalSpace, TAIL_WAG inside approachDistance) that
+ * only fires if the shelter gave that reaction a non-zero weight, after
+ * reactionDelayMs of the player lingering there.
  */
 export function tickDog(
   agent: DogAgent,
-  personality: DogPersonality,
+  settings: DogBehaviorSettings,
   dt: number,
   player: { x: number; y: number },
   bounds: Bounds,
   obstacles: Parameters<typeof stepMovement>[0]['obstacles'],
   rng: () => number = Math.random,
 ): DogAgent {
-  let next = { ...agent, stateElapsed: agent.stateElapsed + dt };
+  const dtMs = dt * 1000;
+  let next: DogAgent = { ...agent, clockMs: agent.clockMs + dtMs };
 
-  const nearPlayer = distance(next.x, next.y, player.x, player.y) < PROXIMITY_NEAR;
+  // --- Player-proximity reaction (only if the shelter enabled it with weight > 0) ---
+  const dist = distance(next.x, next.y, player.x, player.y);
+  const personalSpacePx = settings.personalSpaceTiles * TILE_SIZE_MAP_UNITS;
+  const approachPx = settings.approachDistanceTiles * TILE_SIZE_MAP_UNITS;
+  const desiredReaction: 'BACK_OFF' | 'TAIL_WAG' | null =
+    dist < personalSpacePx && settings.actions.BACK_OFF.weight > 0
+      ? 'BACK_OFF'
+      : dist < approachPx && settings.actions.TAIL_WAG.weight > 0
+        ? 'TAIL_WAG'
+        : null;
 
-  if (nearPlayer && next.state !== 'TAIL_WAG' && next.state !== 'BACK_OFF') {
-    next = personality.sociability > 0.5
-      ? setState(next, 'TAIL_WAG')
-      : setState(next, 'BACK_OFF', {
-          x: next.x + (next.x - player.x),
-          y: next.y + (next.y - player.y),
-        });
-  } else if (!nearPlayer && (next.state === 'TAIL_WAG' || next.state === 'BACK_OFF')) {
-    // Settle into IDLE and hold it — without this the autonomous block below would
-    // see decisionCooldown already expired and re-roll a new state the same tick.
-    next = { ...setState(next, 'IDLE'), decisionCooldown: DECISION_INTERVAL_S };
-  }
-
-  // Autonomous state changes only apply outside the player-reaction states.
-  if (next.state !== 'TAIL_WAG' && next.state !== 'BACK_OFF') {
-    if (next.state === 'SNIFF' && next.stateElapsed >= SNIFF_DURATION_S) {
-      next = setState(next, 'IDLE');
-    } else if (
-      (next.state === 'WALK' || next.state === 'RUN') &&
-      next.target &&
-      distance(next.x, next.y, next.target.x, next.target.y) < TARGET_REACHED_DIST
-    ) {
-      next = setState(next, 'IDLE');
-    } else if (next.state === 'IDLE' || next.state === 'SIT') {
-      next = { ...next, decisionCooldown: Math.max(0, next.decisionCooldown - dt) };
-      if (next.state === 'IDLE' && next.stationaryElapsed >= SIT_AFTER_STATIONARY_S) {
-        next = setState(next, 'SIT');
-      } else if (next.decisionCooldown <= 0) {
-        const picked = pickNextState(personality, rng);
-        const target = picked === 'WALK' || picked === 'RUN' ? randomTargetWithin(bounds, rng) : null;
-        next = { ...setState(next, picked, target), decisionCooldown: DECISION_INTERVAL_S };
+  if (desiredReaction && next.state !== desiredReaction) {
+    if (next.reactionTarget !== desiredReaction) {
+      next = { ...next, reactionTarget: desiredReaction, reactionPendingMs: settings.reactionDelayMs };
+    } else if (next.reactionPendingMs !== null) {
+      const remaining = next.reactionPendingMs - dtMs;
+      if (remaining <= 0) {
+        next = enterState(
+          desiredReaction === 'BACK_OFF'
+            ? {
+                ...next,
+                target: {
+                  x: next.x + (next.x - player.x),
+                  y: next.y + (next.y - player.y),
+                },
+              }
+            : next,
+          desiredReaction,
+          settings,
+          bounds,
+          rng,
+        );
+        next = { ...next, reactionPendingMs: null, reactionTarget: null };
+      } else {
+        next = { ...next, reactionPendingMs: remaining };
       }
     }
-  } else if (next.state === 'TAIL_WAG' && next.stateElapsed < TAIL_WAG_MIN_S) {
-    // hold the pose briefly even if proximity flickers
+  } else if (!desiredReaction) {
+    next = { ...next, reactionPendingMs: null, reactionTarget: null };
+    if (next.state === 'TAIL_WAG' || next.state === 'BACK_OFF') {
+      next = { ...next, cooldownUntilMs: { ...next.cooldownUntilMs, [next.state]: next.clockMs + settings.actions[next.state].cooldownMs } };
+      next = enterState(next, 'IDLE', settings, bounds, rng);
+    }
   }
 
-  // Movement.
-  const moving =
-    (next.state === 'WALK' || next.state === 'RUN' || next.state === 'BACK_OFF') && next.target;
-  if (moving && next.target) {
-    const speed = next.state === 'RUN' ? RUN_SPEED : next.state === 'BACK_OFF' ? BACK_OFF_SPEED : WALK_SPEED;
-    const dx = next.target.x - next.x;
-    const dy = next.target.y - next.y;
+  // --- Autonomous state duration / re-decide (only outside an active reaction) ---
+  if (next.state !== 'TAIL_WAG' && next.state !== 'BACK_OFF') {
+    const reachedTarget =
+      (next.state === 'WALK' || next.state === 'RUN') &&
+      next.target &&
+      distance(next.x, next.y, next.target.x, next.target.y) < TARGET_REACHED_DIST;
+
+    next = { ...next, stateRemainingMs: next.stateRemainingMs - dtMs };
+    if (reachedTarget || next.stateRemainingMs <= 0) {
+      next = {
+        ...next,
+        cooldownUntilMs: { ...next.cooldownUntilMs, [next.state]: next.clockMs + settings.actions[next.state].cooldownMs },
+      };
+      const picked = pickNextState(settings, next.clockMs, next.cooldownUntilMs, rng);
+      next = enterState(next, picked, settings, bounds, rng);
+    }
+  }
+
+  // --- Movement ---
+  const speed = settings.actions[next.state].speedTilesPerSecond * TILE_SIZE_MAP_UNITS;
+  if (speed > 0 && next.target) {
     const moved = stepMovement({
       x: next.x,
       y: next.y,
-      dx,
-      dy,
+      dx: next.target.x - next.x,
+      dy: next.target.y - next.y,
       speed,
       dt,
       radius: DOG_RADIUS,
       bounds,
       obstacles,
     });
-    const displacement = distance(next.x, next.y, moved.x, moved.y);
-    next = {
-      ...next,
-      x: moved.x,
-      y: moved.y,
-      stationaryElapsed: displacement > 0.01 ? 0 : next.stationaryElapsed + dt,
-    };
-  } else {
-    next = { ...next, stationaryElapsed: next.stationaryElapsed + dt };
+    next = { ...next, x: moved.x, y: moved.y };
   }
 
   return next;

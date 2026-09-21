@@ -22,9 +22,9 @@
 | 플랫폼 | React Native — Android + iOS 우선 (bare CLI), 추후 RN Web 확장 |
 | 게임 렌더러 | `@shopify/react-native-skia` + `react-native-reanimated` |
 | 네비게이션 | `@react-navigation/native` (native-stack) |
-| 백엔드 통신 | REST — Spring Boot API (Supabase Auth/PostgreSQL은 백엔드 뒤에 있음, FE는 직접 연결 안 함) |
-| 인증 | 백엔드 `/auth/login`을 통한 Supabase Auth — 토큰은 FE가 AsyncStorage에 저장 |
-| 상태머신 | 강아지 자율 행동 — 순수 로직, 성격 파라미터 가중치 |
+| 백엔드 통신 | REST — 실제 배포된 Spring Boot API (`https://shelter-connect-dev.onrender.com`), DB는 백엔드 뒤에 있음 |
+| 인증 | **FE가 Supabase Auth SDK로 직접 로그인**, `access_token`만 백엔드에 Bearer로 전달 ([auth.md](./auth.md)) |
+| 상태머신 | 강아지 자율 행동 — 백엔드가 내려주는 8종 액션 weight/속도/지속시간/쿨다운을 그대로 재생 (자체 성격 모델 아님, [data-model.md](./data-model.md)) |
 
 ## 폴더 아키텍처
 FSD 전체 적용은 보류 (게임 렌더링 패러다임 충돌 + 1인 프론트 개발 규모 대비 이점 적음).
@@ -64,15 +64,19 @@ src/
 | 실제 로그인·권한 검증, 입양 신청→서류 제출 연결, 대화 영속 저장, 보호소 등록 정책, RN Web 확장 | | 나중 |
 
 ## 관련 컨텍스트 파일
-- [api-conventions.md](./api-conventions.md) — 백엔드 REST 계약 (10개 엔드포인트)
-- [data-model.md](./data-model.md) — 응답 DTO 타입
-- [auth.md](./auth.md) — 로그인/토큰 흐름
+- [api-conventions.md](./api-conventions.md) — 실제 배포된 백엔드 REST 계약 (HANN-Creator/shelter-connect 기준)
+- [data-model.md](./data-model.md) — 응답 DTO 타입 (강아지 행동 설정 포함)
+- [auth.md](./auth.md) — 로그인/토큰 흐름 (Supabase Auth SDK 직접 사용)
 - [game-architecture.md](./game-architecture.md) — 게임 모듈 상세 (화면/애니메이션/상태머신)
 
-## (확인 필요 — Obsidian TODO에서 미결)
-- 성격 파라미터 스키마 최종 확정 (백엔드팀 확인)
+~~성격 파라미터 스키마~~ → 확정됨: FE가 만든 모델이 아니라 백엔드의 `GET /v1/dogs/{id}/behavior`
+(액션별 weight/속도/지속시간/쿨다운)를 그대로 재생. [data-model.md](./data-model.md) 참고.
+
+## (확인 필요 — 미결)
 - 강아지 캐릭터 스프라이트시트 규격 (프레임 크기/수/배치) — 그래픽 담당자 조율
-- 입양 서류 플로우 상세
+- "타일" 단위 ↔ 맵 픽셀 환산값, `mapKey` ↔ FE 맵 폴더 매핑
+- 입양 서류 플로우 상세, `SUPABASE_ANON_KEY` 값 (백엔드팀 확인 필요)
+- 보호소 선택 화면 (지금은 온기 보호소 shelterId 하드코딩)
 
 ~~맵 에셋 형태~~ → 확정됨: 낱개 타일 PNG + JSON 배치 (Tiled 아님). 3종 맵 에셋 확보 완료,
 [game-architecture.md](./game-architecture.md) 참고.
