@@ -3,29 +3,16 @@
  * @format
  */
 
-import { Pressable, StatusBar, Text, useColorScheme, View } from 'react-native';
+import { StatusBar, useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { NavigationContainer, useNavigation } from '@react-navigation/native';
+import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ShelterListScreen } from './src/modules/dog/ShelterListScreen';
 import { GameScreen } from './src/modules/game/GameScreen';
+import type { RootStackParamList } from './src/app/navigation';
 
-// ponytail: placeholder Home screen, replace once modules/shelter (보호소 선택) lands
-function HomeScreen() {
-  const navigation = useNavigation();
-
-  return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
-      <Text style={{ fontSize: 24, fontWeight: '700', marginBottom: 8, color: '#000' }}>보호소 커넥트</Text>
-      <Text style={{ color: '#000', marginBottom: 24 }}>Dev environment ready 🐾</Text>
-      <Pressable onPress={() => navigation.navigate('Game' as never)}>
-        <Text style={{ color: '#4a90d9', fontSize: 16 }}>운동장 들어가기 →</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -36,7 +23,11 @@ function App() {
         <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
         <NavigationContainer>
           <Stack.Navigator>
-            <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen
+              name="Home"
+              component={ShelterListScreen}
+              options={{ title: '보호소 커넥트' }}
+            />
             <Stack.Screen name="Game" component={GameScreen} options={{ headerShown: false }} />
           </Stack.Navigator>
         </NavigationContainer>

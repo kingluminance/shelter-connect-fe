@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useRoute, type RouteProp } from '@react-navigation/native';
 import { Canvas, Circle, FilterMode, Image as SkiaImage, useImage } from '@shopify/react-native-skia';
 import { groundImage, mapLayout, propImages, reedsSheet, grassSheet, waterFullMapFrames } from './core/assets/maps/sunnyMeadow';
 import {
@@ -14,10 +15,8 @@ import { createDogAgent, tickDog, type DogAgent } from './core/systems/dogStateM
 import { stepMovement } from './core/systems/movement';
 import { Joystick } from './input/Joystick';
 import { useShelterDogs, type DogWithBehavior } from '../dog/hooks/useShelterDogs';
+import type { RootStackParamList } from '../../app/navigation';
 
-// 온기 보호소 (mapKey: "sunny") — matches this map asset. Hardcoded until there's a
-// 보호소 선택 screen to pick it from.
-const SUNNY_SHELTER_ID = '02100000-0000-4000-8000-000000000001';
 const DOG_COLORS = ['#e0a458', '#8a6d3b', '#5a3825', '#c9c9c9', '#f0ead6', '#b5651d'];
 
 const DOG_DISPLAY_RADIUS = 9;
@@ -52,6 +51,7 @@ function clamp(value: number, min: number, max: number) {
 // simplest thing that works for one moving entity. Move to useFrameCallback if frame
 // drops show up once more entities are added.
 export function GameScreen() {
+  const { params } = useRoute<RouteProp<RootStackParamList, 'Game'>>();
   const ground = useImage(groundImage);
   const grass = useImage(grassSheet);
   const reeds = useImage(reedsSheet);
@@ -69,7 +69,7 @@ export function GameScreen() {
     useImage(waterFullMapFrames[7]),
   ];
 
-  const shelterDogs = useShelterDogs(SUNNY_SHELTER_ID);
+  const shelterDogs = useShelterDogs(params.shelterId);
 
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const scale = viewportWidth / VIEWPORT_MAP_UNITS;
