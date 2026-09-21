@@ -23,6 +23,11 @@ const VIEWPORT_MAP_UNITS = 160;
 const ANIM_FRAME_MS = 250;
 const ANIM_FRAME_COUNT = 8;
 const PLANT_DISPLAY_SIZE = 24;
+// Walk cycle reads better faster than the 250ms environment clock, and bouncing
+// back and forth through the columns instead of looping straight through reads
+// more like footsteps than the flat forward loop did.
+const PLAYER_ANIM_FRAME_MS = 90;
+const PLAYER_WALK_SEQUENCE = [0, 1, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1];
 
 function clamp(value: number, min: number, max: number) {
   if (max < min) {
@@ -58,6 +63,7 @@ export function GameScreen() {
 
   const [player, setPlayer] = useState(mapLayout.spawn);
   const [animFrame, setAnimFrame] = useState(0);
+  const [playerAnimStep, setPlayerAnimStep] = useState(0);
   const isMoving = useRef(false);
   const facingLeft = useRef(false);
   const direction = useRef({ dx: 0, dy: 0 });
@@ -66,6 +72,7 @@ export function GameScreen() {
     let raf: number;
     let last = Date.now();
     let animAccumulator = 0;
+    let playerAnimAccumulator = 0;
 
     const tick = () => {
       const now = Date.now();
@@ -94,11 +101,22 @@ export function GameScreen() {
         );
       }
 
-      // Water/grass/reeds/player animation share one 250ms-per-frame clock.
+      // Water/grass/reeds animate on the 250ms environment clock.
       animAccumulator += dt * 1000;
       if (animAccumulator >= ANIM_FRAME_MS) {
         animAccumulator %= ANIM_FRAME_MS;
         setAnimFrame(f => (f + 1) % ANIM_FRAME_COUNT);
+      }
+
+      // Player walk cycle runs faster, and only while actually moving.
+      if (isMoving.current) {
+        playerAnimAccumulator += dt * 1000;
+        if (playerAnimAccumulator >= PLAYER_ANIM_FRAME_MS) {
+          playerAnimAccumulator %= PLAYER_ANIM_FRAME_MS;
+          setPlayerAnimStep(s => (s + 1) % PLAYER_WALK_SEQUENCE.length);
+        }
+      } else {
+        playerAnimAccumulator = 0;
       }
 
       raf = requestAnimationFrame(tick);
@@ -127,7 +145,7 @@ export function GameScreen() {
     [],
   );
 
-  const playerFrame = isMoving.current ? animFrame : 0;
+  const playerFrame = isMoving.current ? PLAYER_WALK_SEQUENCE[playerAnimStep] : 0;
 
   return (
     <View style={styles.container}>
