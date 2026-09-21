@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
-import { Canvas, Circle, Image as SkiaImage, useImage } from '@shopify/react-native-skia';
+import { Canvas, Circle, FilterMode, Image as SkiaImage, useImage } from '@shopify/react-native-skia';
 import { groundImage, mapLayout, propImages, reedsSheet, grassSheet, waterFullMapFrames } from './core/assets/maps/sunnyMeadow';
 import {
   PLAYER_FRAME_SIZE,
@@ -17,6 +17,8 @@ import { Joystick } from './input/Joystick';
 
 const DOG_DISPLAY_RADIUS = 9;
 const DOG_TAIL_WAG_RADIUS = 12;
+// Pixel art, nearest-neighbor only — no blur from bilinear interpolation on upscale.
+const NEAREST_SAMPLING = { filter: FilterMode.Nearest };
 
 const PLAYER_RADIUS = 10;
 const PLAYER_DISPLAY_SIZE = 44;
@@ -184,6 +186,7 @@ export function GameScreen() {
               width={mapLayout.width * scale}
               height={mapLayout.height * scale}
               fit="fill"
+              sampling={NEAREST_SAMPLING}
             />
           )}
           {waterFrames[animFrame] && (
@@ -194,6 +197,7 @@ export function GameScreen() {
               width={mapLayout.width * scale}
               height={mapLayout.height * scale}
               fit="fill"
+              sampling={NEAREST_SAMPLING}
             />
           )}
           {mapLayout.environment.plants.map((plant, index) => {
@@ -232,6 +236,7 @@ export function GameScreen() {
                 width={object.w * scale}
                 height={object.h * scale}
                 fit="fill"
+                sampling={NEAREST_SAMPLING}
               />
             );
           })}

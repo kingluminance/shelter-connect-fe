@@ -1,5 +1,8 @@
-import { Group, Image as SkiaImage } from '@shopify/react-native-skia';
+import { FilterMode, Group, Image as SkiaImage } from '@shopify/react-native-skia';
 import type { SkImage } from '@shopify/react-native-skia';
+
+// Pixel art, nearest-neighbor only — no blur from bilinear interpolation on upscale.
+const NEAREST_SAMPLING = { filter: FilterMode.Nearest };
 
 interface SpriteFrameProps {
   sheet: SkImage;
@@ -49,6 +52,7 @@ export function SpriteFrame({ sheet, frameSize, col, row, x, y, size, flipX }: S
         width={sheetWidth}
         height={sheetHeight}
         fit="fill"
+        sampling={NEAREST_SAMPLING}
       />
     </Group>
   );
