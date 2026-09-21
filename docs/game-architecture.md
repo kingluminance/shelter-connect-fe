@@ -38,7 +38,9 @@
 Skia 캔버스에 스프라이트 렌더
 ```
 
-구현 위치: `src/modules/game/core/systems/stateMachine.ts`, `movement.ts`
+구현 위치: `src/modules/game/core/systems/dogStateMachine.ts`, `movement.ts` — IDLE/WALK/RUN/SNIFF/SIT는
+성격 가중 랜덤 전환, TAIL_WAG/BACK_OFF는 플레이어 근접 시 강제 전환(사교성 기준), IDLE로 10초 정지
+시 SIT. LIE_DOWN은 아직 미구현. `sampleDogs.ts`에 백엔드 연동 전 임시 강아지 5마리 데이터.
 
 ## 공놀이(공 물어오기) 상태 흐름
 ```
@@ -66,9 +68,11 @@ IDLE/WALK
 **이번 버전 구현 대상은 여전히 `sunny-meadow`(햇살 운동장) 1개.** 나머지 두 맵(`woodland-trail`,
 `lakeside-retreat`)은 에셋만 들어와 있고 화면 연결은 나중 버전.
 
-**GameScreen 현재 상태(`src/modules/game/GameScreen.tsx`)**: `ground.png` 정적 렌더 + 조이스틱으로
-움직이는 원(placeholder) 플레이어. `layout.json`의 bounds/obstacles로 충돌 처리(`movement.ts`).
-아직 안 한 것: water/grass/reeds 애니메이션 재생, props 레이어 렌더(깊이 정렬), 강아지 캐릭터/상태머신.
+**GameScreen 현재 상태(`src/modules/game/GameScreen.tsx`)**: 화면 전체를 채우는 플레이어 추적 카메라,
+water/grass/reeds 애니메이션, 깊이 정렬된 props, 플레이어 스프라이트(걷기 애니메이션 + 좌우 반전 —
+방향별 아트가 없어서 미러링으로 대체), 상태머신으로 자율 행동하는 강아지 5마리(placeholder 원, 스프라이트
+없음). 아직 안 한 것: 강아지 캐릭터 스프라이트, LIE_DOWN 상태, 공놀이(ballPlay.ts), 강아지-props 깊이 정렬
+(지금은 props보다 위 레이어에 그려짐), 대화 진입 흐름.
 
 ## 대화 AI
 이동/행동 시스템과 달리 대화 부분에만 실제 LLM(GPT-5.6-luna) 호출 — 관찰 기록 기반 grounded chat.
