@@ -15,11 +15,11 @@ import { Joystick } from './input/Joystick';
 
 const PLAYER_RADIUS = 10;
 const PLAYER_DISPLAY_SIZE = 28;
-const PLAYER_SPEED = 90; // px/s of map space
+const PLAYER_SPEED = 55; // px/s of map space
 const RUN_MULTIPLIER = 1.8;
 // How many map units are visible across the viewport's width — smaller = more zoomed in.
 // Height follows the screen's aspect ratio so a tall phone just shows more vertically.
-const VIEWPORT_MAP_UNITS = 260;
+const VIEWPORT_MAP_UNITS = 160;
 const ANIM_FRAME_MS = 250;
 const ANIM_FRAME_COUNT = 8;
 const PLANT_DISPLAY_SIZE = 24;
