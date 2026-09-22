@@ -46,7 +46,7 @@ GET /v1/dogs/{id}/behavior → 8종 액션별 weight/속도/지속시간/쿨다�
 매 틱(tick)마다: 방문자 근접 시 TAIL_WAG/BACK_OFF 반응(reactionDelayMs 대기),
                  아니면 쿨다운 안 걸린 액션 중 weight 가중 랜덤 선택
     ↓
-Skia 캔버스에 렌더 (아직 placeholder 원 — 강아지 스프라이트 없음)
+Skia 캔버스에 렌더 (도트 스프라이트, `core/assets/dog/dogWalkAtlas.ts` — 상세는 아래 참고)
 ```
 
 구현 위치: `src/modules/game/core/systems/dogStateMachine.ts`(순수 로직, `modules/dog/types.ts`의
@@ -57,10 +57,24 @@ Skia 캔버스에 렌더 (아직 placeholder 원 — 강아지 스프라이트 �
 (`dogStateMachine.test.ts`). LIE_DOWN은 weight 0이면 자연히 재생 안 됨(백엔드 기본값 그대로).
 
 ## 공놀이(공 물어오기)
-`DogBehaviorSettings.ballPlay`(`chaseEnabled`/`returnEnabled`/`reactionDelayMs`)로 백엔드가 이미 필드를
-내려주지만, FE에 공 던지기 UI/충돌 로직 자체가 아직 없어 미구현. 기본값은 꺼짐(`chaseEnabled: false`).
-- 구현 위치(예정): `src/modules/game/core/systems/ballPlay.ts` (이동은 `movement.ts` 재사용)
-- 모바일: 탭 버튼으로 공 던지기 (프로토타입의 E키 대응)
+구현 완료: `src/modules/game/core/systems/ballPlay.ts` (순수 로직, `movement.ts`의 `stepMovement`·
+`dogStateMachine.ts`의 `TILE_SIZE_MAP_UNITS`/`DOG_RADIUS` 재사용) + `GameScreen.tsx`의 "공 던지기" 탭 버튼
+(프로토타입의 E키 대응 — 모바일이라 버튼 방식).
+
+백엔드는 `DogBehaviorSettings.ballPlay`(`chaseEnabled`/`returnEnabled`/`reactionDelayMs`) 세 필드만
+내려주고 "이동·공 충돌과 복귀 경로는 앱에서 처리해"(dog-behavior-api.md)라고 명시 — 5단계 상태
+흐름(`THROWN → CHASING → GRABBING → RETURNING → DROPPING`)은 옵시디언 프로토타입의 UX 설계를 그대로
+차용한 FE 자체 구현이며, 성격 파라미터(playfulness 등 예전 모델)는 쓰지 않는다.
+
+- `chaseEnabled=false`면 탭해도 무시(`throwBall`이 원래 상태 그대로 반환)
+- 쫓아갈 때 속도는 RUN weight>0이면 RUN, 아니면 WALK (백엔드 문서 그대로)
+- `returnEnabled=false`면 GRABBING 다음 바로 DROPPING — 가져오기 단계 생략
+- 공놀이 중엔 `tickDog`(8종 배회 FSM)을 아예 호출하지 않음 — 끝나면 이전 상태·쿨다운에서 그대로 재개
+- 던지는 방향은 플레이어의 마지막 이동 방향(`lastDirectionRef`), 고정 거리(`THROW_DISTANCE`)만큼
+- 공 자체도 depth 정렬 대상(`ball.ballY`)이라 props 앞/뒤 렌더링이 강아지·플레이어와 일관됨
+- **실제 배포 서버의 3마리는 전부 `basis: DEFAULT`(확인된 행동 없음) → `chaseEnabled: false`라 지금은
+  공 던지기 버튼이 뜨지 않음** — 그래픽팀이 아니라 보호소가 실제 행동을 확인·저장해야 나타남
+- 테스트: `ballPlay.test.ts` — 거부 조건 2개 + returnEnabled true/false 전체 사이클 각 1개
 
 ## 맵
 3종 맵 에셋 확보 완료 (`src/modules/game/core/assets/maps/`) — 낱개 타일 PNG + JSON 배치 방식
@@ -105,7 +119,7 @@ PIL 스크립트가 좌표로 직접 그린 정적 이미지(CREDITS.md 확인 �
 탭하면 그 강아지의 `dogId`·이름·스프라이트 정체성 인덱스를 들고 `Chat` 화면으로 이동한다(공놀이 던지기
 버튼과 같은 근접-감지 패턴).
 
-아직 안 한 것: 공놀이(ballPlay.ts), 강아지 전용 포즈 아트.
+아직 안 한 것: 강아지 전용 포즈 아트(공놀이 GRABBING/DROPPING도 SNIFF 재사용 중).
 
 ## 대화 AI
 이동/행동 시스템과 달리 대화 부분에만 실제 LLM(GPT-5.6-luna) 호출 — 관찰 기록 기반 grounded chat.

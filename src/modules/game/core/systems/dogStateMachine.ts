@@ -7,9 +7,11 @@ export type DogState = DogActionKey;
 // the map assets don't define anywhere — picked 24 map-units/tile (matches the env
 // animation frame size) as a working assumption. Confirm with backend/art before
 // this ships past a demo.
-const TILE_SIZE_MAP_UNITS = 24;
+// Exported: ballPlay.ts reuses these so chase/return speed stays consistent with
+// normal wandering speed.
+export const TILE_SIZE_MAP_UNITS = 24;
 
-const DOG_RADIUS = 8;
+export const DOG_RADIUS = 8;
 const TARGET_REACHED_DIST = 4;
 
 export interface DogAgent {
