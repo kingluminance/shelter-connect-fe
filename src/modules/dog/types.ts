@@ -116,3 +116,13 @@ export interface ChatReplyResult {
   retryable: boolean;
   reply: ChatMessage | null;
 }
+
+// docs/photo-read-api.md (B-08/B-12) — only reachable after 1+ COMPLETED chat reply.
+export interface DogPhoto {
+  id: string;
+  dogId: string;
+  sortOrder: number;
+  caption: string | null;
+  url: string;
+  expiresAt: string;
+}

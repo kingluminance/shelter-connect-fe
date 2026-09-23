@@ -24,7 +24,9 @@
 - "보호소에 확인할 질문으로 담기" — `needsShelterConfirmation: true`인 답변에만 노출, **로컬 state에만
   저장**(백엔드에 저장 API 없음 — 프로토타입도 세션 내 메모리에만 들고 있던 방식 그대로)
 - 대화 수첩 접이식 — 전체 히스토리
-- **사진 언락(`이제 내 모습도 만나볼래?`) 화면은 이번 범위 제외** — 프로필/사진 화면 자체가 아직 없음
+- 완료된 답변이 하나라도 오면 "이제 내 모습도 만나볼래?" → "사진으로 만나기" 버튼이 뜨고, 어시스턴트
+  답변 전체(`knownFacts`)와 저장해둔 질문(`pendingQuestions`)을 들고 `Profile` 화면으로 이동한다
+  (상세는 [profile-screen.md](./profile-screen.md))
 
 ## 진입점
 `GameScreen.tsx`에서 강아지 40map-unit 이내 접근 시 "말 걸기" 버튼 → `Chat` 라우트로 이동

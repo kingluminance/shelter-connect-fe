@@ -69,6 +69,7 @@ src/
 - [auth.md](./auth.md) — 로그인/토큰 흐름 (Supabase Auth SDK 직접 사용)
 - [game-architecture.md](./game-architecture.md) — 게임 모듈 상세 (화면/애니메이션/상태머신)
 - [chat-screen.md](./chat-screen.md) — 강아지 대화 화면("PUPPY CONNECT") 상세
+- [profile-screen.md](./profile-screen.md) — 강아지 소개서(사진 언락) 화면 상세
 - [task-log.md](./task-log.md) — 작업 ID(`F-XX`) 로그, 커밋·PR 제목에 붙이는 번호 출처
 
 ~~성격 파라미터 스키마~~ → 확정됨: FE가 만든 모델이 아니라 백엔드의 `GET /v1/dogs/{id}/behavior`
