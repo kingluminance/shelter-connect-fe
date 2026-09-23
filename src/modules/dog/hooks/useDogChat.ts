@@ -6,7 +6,7 @@ import type { ChatMessage, ChatSession } from '../types';
 
 export type DogChatState =
   | { status: 'loading' }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: string; code: string | null }
   | {
       status: 'ready';
       session: ChatSession;
@@ -32,7 +32,11 @@ export function useDogChat(dogId: string) {
         }
       } catch (err) {
         if (!cancelled) {
-          setState({ status: 'error', message: err instanceof ApiError ? err.message : String(err) });
+          setState({
+            status: 'error',
+            message: err instanceof ApiError ? err.message : String(err),
+            code: err instanceof ApiError ? err.code : null,
+          });
         }
       }
     })();

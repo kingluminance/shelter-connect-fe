@@ -37,7 +37,15 @@
 이번 버전 FE 범위(방문자 앱)는 보호소 관리 기능을 쓰지 않으므로 대부분 "로그인 안 함 / 등록된 일반 사용자"
 경로만 해당. 강아지 대화·입양 메모 저장 등 로그인이 필요한 기능을 붙일 때 위 흐름을 그대로 쓰면 됨.
 
+## 로그인 화면
+`src/modules/auth/LoginScreen.tsx` — 이메일/비밀번호 로그인+회원가입 폼 (`supabase.auth.signInWithPassword`
+/ `signUp`), 성공 직후 위 2단계(`POST /v1/me`)까지 자동으로 처리. 진입점: `ShelterListScreen`(Home)
+우상단 "로그인" 링크, `ChatScreen`이 `401 UNAUTHENTICATED`/`403 ACCOUNT_NOT_REGISTERED`를 받으면
+"로그인하기" 버튼 노출. 디자인은 프로토타입(`shelter-mobile.html`)의 앱 셸 톤(크림 배경 `#fff9e9`,
+네이비 잉크 `#172b56`, 노랑 포인트 `#ffdc79`, 파랑 primary 버튼 `#4f85f4` + 3px 오프셋 그림자) 그대로.
+`SUPABASE_ANON_KEY`가 비어 있으면(`supabase`가 `null`) 폼 대신 "설정 중" 안내만 보여줌 — 크래시 아님.
+
 ## (확인 필요)
 - Supabase 프로젝트의 `SUPABASE_ANON_KEY` (URL은 확인됨: `https://gwimdiwrqfcqulefshoz.supabase.co`,
-  `.env.example` 참고) — 백엔드팀에게 요청
-- 로그인 화면 자체 UX(이메일/비밀번호 vs 소셜)는 미정, 백엔드 문서도 "C-02에서 정할 내용"이라고 명시
+  `.env.example` 참고) — 백엔드팀에게 요청. 이게 없으면 로그인 화면이 폼 대신 안내 문구만 보여줌
+- 소셜 로그인 여부는 여전히 미정(백엔드 문서 "C-02에서 정할 내용") — 이메일/비밀번호만 우선 구현
