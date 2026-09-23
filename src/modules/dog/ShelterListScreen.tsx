@@ -30,6 +30,9 @@ export function ShelterListScreen() {
 
   return (
     <View style={styles.container}>
+      <Pressable style={styles.loginLink} onPress={() => navigation.navigate('Login')}>
+        <Text style={styles.loginLinkText}>로그인</Text>
+      </Pressable>
       <FlatList
         data={state.shelters}
         keyExtractor={item => item.id}
@@ -50,6 +53,8 @@ export function ShelterListScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
+  loginLink: { alignSelf: 'flex-end', paddingHorizontal: 16, paddingTop: 12 },
+  loginLinkText: { color: '#4f85f4', fontSize: 13, fontWeight: '600' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', gap: 8 },
   statusText: { color: '#000' },
   list: { padding: 16, gap: 12 },

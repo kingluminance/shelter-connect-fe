@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, type NavigationProp, type RouteProp } from '@react-navigation/native';
 import { Canvas, useImage } from '@shopify/react-native-skia';
 // Reused from the game module: a screen composing another domain's rendering
 // utility is the same "screens cross module boundaries" exception CLAUDE.md
@@ -25,7 +25,7 @@ const QUICK_TOPICS = ['산책은 어때?', '혼자 있어도 괜찮아?', '낯�
 const AVATAR_SIZE = 128;
 
 export function ChatScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { params } = useRoute<RouteProp<RootStackParamList, 'Chat'>>();
   const dogSheet = useImage(dogWalkAtlas);
   const { state, send } = useDogChat(params.dogId);
@@ -92,7 +92,14 @@ export function ChatScreen() {
             <View style={styles.dialogue}>
               {state.status === 'loading' && <ActivityIndicator />}
               {state.status === 'error' && (
-                <Text style={styles.errorText}>대화를 시작하지 못했어요: {state.message}</Text>
+                <>
+                  <Text style={styles.errorText}>대화를 시작하지 못했어요: {state.message}</Text>
+                  {(state.code === 'UNAUTHENTICATED' || state.code === 'ACCOUNT_NOT_REGISTERED') && (
+                    <Pressable onPress={() => navigation.navigate('Login')}>
+                      <Text style={styles.loginCta}>로그인하기</Text>
+                    </Pressable>
+                  )}
+                </>
               )}
               {state.status === 'ready' && (
                 <>
@@ -275,6 +282,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
     color: '#514834',
+  },
+  loginCta: {
+    fontSize: 13,
+    color: '#277fb0',
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+    marginTop: 10,
   },
   errorText: {
     fontSize: 12,

@@ -11,6 +11,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ShelterListScreen } from './src/modules/dog/ShelterListScreen';
 import { ChatScreen } from './src/modules/dog/ChatScreen';
 import { GameScreen } from './src/modules/game/GameScreen';
+import { LoginScreen } from './src/modules/auth/LoginScreen';
 import type { RootStackParamList } from './src/app/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -31,6 +32,7 @@ function App() {
             />
             <Stack.Screen name="Game" component={GameScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Login" component={LoginScreen} options={{ title: '로그인' }} />
           </Stack.Navigator>
         </NavigationContainer>
       </SafeAreaProvider>
