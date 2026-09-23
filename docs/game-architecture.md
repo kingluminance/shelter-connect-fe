@@ -94,12 +94,17 @@ PIL 스크립트가 좌표로 직접 그린 정적 이미지(CREDITS.md 확인 �
 이전엔 강아지·플레이어가 무조건 props보다 나중에(위에) 그려져서 나무 뒤에 서도 나무 위로 올라와
 보이는 버그가 있었음 — 고정 좌표로 나무 앞/뒤에 세워서 스크린샷으로 확인·수정 완료.
 
-아직 안 한 것: 공놀이(ballPlay.ts), 대화 진입 흐름, 강아지 전용 포즈 아트.
+**대화 진입(`GameScreen.tsx`)**: 플레이어가 강아지 40map-unit 이내로 다가가면 "말 걸기" 버튼이 뜨고,
+탭하면 그 강아지의 `dogId`·이름·스프라이트 정체성 인덱스를 들고 `Chat` 화면으로 이동한다(공놀이 던지기
+버튼과 같은 근접-감지 패턴).
+
+아직 안 한 것: 공놀이(ballPlay.ts), 강아지 전용 포즈 아트.
 
 ## 대화 AI
 이동/행동 시스템과 달리 대화 부분에만 실제 LLM(GPT-5.6-luna) 호출 — 관찰 기록 기반 grounded chat.
-백엔드는 이미 구현·검증됨(`grounded-chat-api.md`)이지만 **배포 서버에서 현재 `AI_ENABLED=false`**라 아직
-호출 불가. 연동은 [docs/api-conventions.md](./api-conventions.md) 참고.
+화면·API 연동 구현 완료(`src/modules/dog/ChatScreen.tsx`, `hooks/useDogChat.ts`) — 상세는
+[docs/chat-screen.md](./chat-screen.md) 참고. 백엔드는 이미 구현·검증됨(`grounded-chat-api.md`)이지만
+**배포 서버에서 현재 `AI_ENABLED=false`**라 실제 답변은 아직 503. 연동은 [docs/api-conventions.md](./api-conventions.md) 참고.
 
 ## (확인 필요)
 - 실제 강아지별 스프라이트 (`avatarKey` ↔ 아트 매핑) — 지금은 프로토타입 자산 3종을 인덱스로 순환 배정한 자리표시자
