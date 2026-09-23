@@ -12,4 +12,5 @@
 | F-03 | 강아지 스프라이트(placeholder 원 → 도트) + 깊이 정렬 버그 수정 + 행동별 애니메이션 | [#2](https://github.com/kingluminance/shelter-connect-fe/pull/2) | ✅ |
 | F-04 | 공놀이(ballPlay) 미니게임 | - | 🔜 PR 대기 (`feature/ball-play`) |
 | F-05 | 강아지 채팅 — "PUPPY CONNECT" 게임기 UI, 실제 백엔드 대화 API 연동 | [#3](https://github.com/kingluminance/shelter-connect-fe/pull/3) | ✅ |
-| F-06 | 로그인 화면 (이메일/비밀번호, Supabase Auth SDK 직접 호출) | - | 🚧 진행 중 (`feature/login-screen`) |
+| F-06 | 로그인 화면 (이메일/비밀번호, Supabase Auth SDK 직접 호출) | [#4](https://github.com/kingluminance/shelter-connect-fe/pull/4) | ✅ |
+| F-07 | 강아지 소개서 화면 (사진 언락, 클립보드 디자인) | - | 🚧 진행 중 (`feature/dog-profile`) |

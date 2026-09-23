@@ -152,6 +152,26 @@ export function ChatScreen() {
               </Pressable>
             )}
 
+            {latestAssistant && (
+              <View style={styles.revealInvite}>
+                <Text style={styles.revealInviteText}>이제 내 모습도 만나볼래?</Text>
+                <Pressable
+                  style={styles.revealButton}
+                  onPress={() =>
+                    navigation.navigate('Profile', {
+                      dogId: params.dogId,
+                      dogName: params.dogName,
+                      identityIndex: params.identityIndex,
+                      knownFacts: messages.filter(m => m.role === 'ASSISTANT').map(m => m.text),
+                      pendingQuestions,
+                    })
+                  }
+                >
+                  <Text style={styles.revealButtonText}>사진으로 만나기</Text>
+                </Pressable>
+              </View>
+            )}
+
             {messages.length > 0 && (
               <View style={styles.notebook}>
                 <Pressable onPress={() => setNotebookOpen(open => !open)} style={styles.notebookSummary}>
@@ -353,6 +373,30 @@ const styles = StyleSheet.create({
     color: '#754733',
     textDecorationLine: 'underline',
     paddingVertical: 12,
+  },
+  revealInvite: {
+    marginTop: 21,
+    alignItems: 'center',
+  },
+  revealInviteText: {
+    fontSize: 12,
+    color: INK,
+    marginBottom: 8,
+  },
+  revealButton: {
+    width: '100%',
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#c45870',
+    borderRadius: 11,
+    backgroundColor: '#ffa5ad',
+  },
+  revealButtonText: {
+    color: '#613643',
+    fontSize: 13,
+    fontWeight: '600',
   },
   notebook: {
     marginTop: 17,

@@ -10,6 +10,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ShelterListScreen } from './src/modules/dog/ShelterListScreen';
 import { ChatScreen } from './src/modules/dog/ChatScreen';
+import { ProfileScreen } from './src/modules/dog/ProfileScreen';
 import { GameScreen } from './src/modules/game/GameScreen';
 import { LoginScreen } from './src/modules/auth/LoginScreen';
 import type { RootStackParamList } from './src/app/navigation';
@@ -33,6 +34,7 @@ function App() {
             <Stack.Screen name="Game" component={GameScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Login" component={LoginScreen} options={{ title: '로그인' }} />
+            <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: '소개서' }} />
           </Stack.Navigator>
         </NavigationContainer>
       </SafeAreaProvider>
