@@ -36,16 +36,23 @@ cd ios && pod install   # 네이티브 의존성 변경 후
 - 작업 브랜치: `feature/<설명>`, `fix/<설명>`, `chore/<설명>` (예: `feature/shelter-list-screen`)
 - 브랜치 하나당 하나의 논리적 변경 단위
 
+## 작업 ID
+백엔드 레포(HANN-Creator/shelter-connect)가 PR·커밋에 `[B-14]`, `[Q-02]`처럼 작업 ID를 붙이는 방식을
+따른다. 이 레포는 `F-XX`(Frontend) 접두사를 쓴다. 새 기능/작업 단위를 시작할 때
+[docs/task-log.md](./docs/task-log.md)에 다음 번호로 한 줄 추가하고, 그 번호를 커밋 제목과 PR 제목
+양쪽에 붙인다. 버그 수정처럼 독립 작업이 아닌 후속 커밋(같은 PR 안에서 리뷰 반영 등)은 새 ID 없이
+같은 PR의 제목 ID를 따라간다.
+
 ## 커밋 규칙
-[Conventional Commits](https://www.conventionalcommits.org/) 사용: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`, `test:`
+[Conventional Commits](https://www.conventionalcommits.org/) 형식 앞에 작업 ID를 붙인다: `[F-XX] feat: ...`
 ```
-feat: 보호소 목록 화면 추가
-fix: 강아지 상태머신 전환 확률 버그 수정
+[F-02] feat: 보호소 목록 화면 추가
+[F-05] fix: 강아지 상태머신 전환 확률 버그 수정
 ```
 
 ## PR 규칙
 - `main`으로 머지하는 모든 변경은 PR을 통해서만 (직접 push 금지)
-- PR 제목은 커밋 컨벤션과 동일한 형식
+- PR 제목은 커밋 컨벤션과 동일한 형식(`[F-XX] ...`)
 - 머지 전 필수: `npx tsc --noEmit`, `npm run lint` 통과
 - PR 본문에 변경 이유와 테스트 방법 간단히 기재
 - game 모듈(`src/modules/game/core`) 변경 시 RN 전용 API 미사용 여부 리뷰에서 확인

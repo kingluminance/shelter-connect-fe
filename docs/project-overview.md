@@ -68,6 +68,7 @@ src/
 - [data-model.md](./data-model.md) — 응답 DTO 타입 (강아지 행동 설정 포함)
 - [auth.md](./auth.md) — 로그인/토큰 흐름 (Supabase Auth SDK 직접 사용)
 - [game-architecture.md](./game-architecture.md) — 게임 모듈 상세 (화면/애니메이션/상태머신)
+- [task-log.md](./task-log.md) — 작업 ID(`F-XX`) 로그, 커밋·PR 제목에 붙이는 번호 출처
 
 ~~성격 파라미터 스키마~~ → 확정됨: FE가 만든 모델이 아니라 백엔드의 `GET /v1/dogs/{id}/behavior`
 (액션별 weight/속도/지속시간/쿨다운)를 그대로 재생. [data-model.md](./data-model.md) 참고.
