@@ -9,6 +9,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ShelterListScreen } from './src/modules/dog/ShelterListScreen';
+import { ChatScreen } from './src/modules/dog/ChatScreen';
 import { GameScreen } from './src/modules/game/GameScreen';
 import type { RootStackParamList } from './src/app/navigation';
 
@@ -29,6 +30,7 @@ function App() {
               options={{ title: '보호소 커넥트' }}
             />
             <Stack.Screen name="Game" component={GameScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: false }} />
           </Stack.Navigator>
         </NavigationContainer>
       </SafeAreaProvider>

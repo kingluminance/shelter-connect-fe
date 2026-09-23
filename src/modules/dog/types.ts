@@ -80,3 +80,39 @@ export interface Page<T> {
   data: T[];
   nextCursor: string | null;
 }
+
+// docs/chat-storage-api.md (B-06) + docs/grounded-chat-api.md (B-07)
+export interface ChatSession {
+  id: string;
+  dogId: string;
+  status: 'OPEN' | 'CLOSED';
+  canSend: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ChatMessageRole = 'USER' | 'ASSISTANT';
+export type ChatProcessingStatus = 'PENDING' | 'COMPLETED' | 'FAILED';
+
+export interface ChatMessage {
+  id: string;
+  sessionId: string;
+  dogId: string;
+  role: ChatMessageRole;
+  text: string;
+  clientMessageId: string | null;
+  replyToMessageId: string | null;
+  processingStatus: ChatProcessingStatus;
+  failureCode: string | null;
+  needsShelterConfirmation: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatReplyResult {
+  requestMessageId: string;
+  processingStatus: ChatProcessingStatus;
+  failureCode: string | null;
+  retryable: boolean;
+  reply: ChatMessage | null;
+}

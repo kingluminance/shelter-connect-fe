@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { useRoute, type RouteProp } from '@react-navigation/native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useNavigation, useRoute, type NavigationProp, type RouteProp } from '@react-navigation/native';
 import { Canvas, FilterMode, Image as SkiaImage, useImage } from '@shopify/react-native-skia';
 import { groundImage, mapLayout, propImages, reedsSheet, grassSheet, waterFullMapFrames } from './core/assets/maps/sunnyMeadow';
 import {
@@ -45,6 +45,8 @@ const PLANT_DISPLAY_SIZE = 24;
 // more like footsteps than the flat forward loop did.
 const PLAYER_ANIM_FRAME_MS = 90;
 const PLAYER_WALK_SEQUENCE = [0, 1, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1];
+// How close the player needs to be to a dog before "talk" shows up, in map units.
+const TALK_RANGE = 40;
 
 function clamp(value: number, min: number, max: number) {
   if (max < min) {
@@ -81,6 +83,7 @@ function nextDogFacing(agent: DogAgent, previous: DogFacing): DogFacing {
 // simplest thing that works for one moving entity. Move to useFrameCallback if frame
 // drops show up once more entities are added.
 export function GameScreen() {
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { params } = useRoute<RouteProp<RootStackParamList, 'Game'>>();
   const ground = useImage(groundImage);
   const grass = useImage(grassSheet);
@@ -252,6 +255,10 @@ export function GameScreen() {
     });
   }
 
+  // Talk target: the nearest dog within range.
+  let talkTargetIndex: number | null = null;
+  let talkTargetDist = TALK_RANGE;
+
   if (dogSheet) {
     dogs.forEach((dog, i) => {
       const identity = i % DOG_IDENTITY_COUNT;
@@ -275,6 +282,27 @@ export function GameScreen() {
           />
         ),
       });
+
+      const dist = Math.hypot(dog.x - player.x, dog.y - player.y);
+      if (dist < talkTargetDist) {
+        talkTargetDist = dist;
+        talkTargetIndex = i;
+      }
+    });
+  }
+
+  function openChat() {
+    if (talkTargetIndex === null) {
+      return;
+    }
+    const dog = dogMeta[talkTargetIndex];
+    if (!dog) {
+      return;
+    }
+    navigation.navigate('Chat', {
+      dogId: dog.id,
+      dogName: dog.name,
+      identityIndex: talkTargetIndex % DOG_IDENTITY_COUNT,
     });
   }
 
@@ -352,6 +380,11 @@ export function GameScreen() {
         <View style={styles.joystick}>
           <Joystick onChange={(dx, dy) => { direction.current = { dx, dy }; }} />
         </View>
+        {talkTargetIndex !== null && (
+          <Pressable style={styles.talkButton} onPress={openChat}>
+            <Text style={styles.talkButtonText}>말 걸기</Text>
+          </Pressable>
+        )}
         {shelterDogs.status === 'loading' && (
           <View style={styles.statusBanner}>
             <ActivityIndicator color="#fff" />
@@ -377,6 +410,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     bottom: 16,
+  },
+  talkButton: {
+    position: 'absolute',
+    right: 16,
+    bottom: 24,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  talkButtonText: {
+    color: '#fff',
+    fontWeight: '600',
   },
   statusBanner: {
     position: 'absolute',
