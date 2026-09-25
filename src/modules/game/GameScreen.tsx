@@ -379,6 +379,7 @@ export function GameScreen() {
       dogId: dog.id,
       dogName: dog.name,
       identityIndex: talkTargetIndex % DOG_IDENTITY_COUNT,
+      shelterName: params.shelterName,
     });
   }
 
