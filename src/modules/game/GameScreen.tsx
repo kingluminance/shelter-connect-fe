@@ -379,6 +379,10 @@ export function GameScreen() {
       dogId: dog.id,
       dogName: dog.name,
       identityIndex: talkTargetIndex % DOG_IDENTITY_COUNT,
+    });
+  }
+
+  function handleThrow() {
     if (throwTargetIndex === null) {
       return;
     }
