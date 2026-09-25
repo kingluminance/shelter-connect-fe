@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { fetchChatMessages, openChatSession, requestChatReply, sendChatMessage } from '../api/chat';
 import { generateClientMessageId } from '../../../shared/lib/clientId';
 import { ApiError } from '../../../shared/lib/apiClient';
@@ -13,13 +14,15 @@ export type DogChatState =
       messages: ChatMessage[];
       sending: boolean;
       sendError: string | null;
+      /** The USER message whose reply failed with retryable=true, if any. */
+      retryableMessageId: string | null;
     };
 
 /** Opens (or resumes) a dog's chat session and sends messages through it (docs/chat-storage-api.md, docs/grounded-chat-api.md). */
 export function useDogChat(dogId: string) {
   const [state, setState] = useState<DogChatState>({ status: 'loading' });
 
-  useEffect(() => {
+  const load = useCallback(() => {
     let cancelled = false;
     setState({ status: 'loading' });
 
@@ -28,7 +31,7 @@ export function useDogChat(dogId: string) {
         const { data: session } = await openChatSession(dogId);
         const { data: messages } = await fetchChatMessages(session.id, { limit: 50 });
         if (!cancelled) {
-          setState({ status: 'ready', session, messages, sending: false, sendError: null });
+          setState({ status: 'ready', session, messages, sending: false, sendError: null, retryableMessageId: null });
         }
       } catch (err) {
         if (!cancelled) {
@@ -46,9 +49,41 @@ export function useDogChat(dogId: string) {
     };
   }, [dogId]);
 
+  // A plain mount-time effect never re-runs on dogId alone — leaving a chat screen to
+  // log in and coming straight back (same dogId) would otherwise strand the screen on
+  // its earlier UNAUTHENTICATED error forever. Re-open every time this screen regains
+  // focus instead.
+  useFocusEffect(useCallback(() => load(), [load]));
+
+  const requestReply = useCallback(async (sessionId: string, userMessage: ChatMessage, retry: boolean) => {
+    try {
+      const { data: result } = await requestChatReply(sessionId, userMessage.id, retry);
+      setState(prev => {
+        if (prev.status !== 'ready') {
+          return prev;
+        }
+        const messages = result.reply ? [...prev.messages, result.reply] : prev.messages;
+        return {
+          ...prev,
+          messages,
+          sending: false,
+          sendError: result.reply ? null : result.failureCode ?? '답변을 받지 못했어요',
+          retryableMessageId: !result.reply && result.retryable ? userMessage.id : null,
+        };
+      });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : String(err);
+      setState(prev =>
+        prev.status === 'ready'
+          ? { ...prev, sending: false, sendError: message, retryableMessageId: userMessage.id }
+          : prev,
+      );
+    }
+  }, []);
+
   const send = useCallback(
     async (text: string) => {
-      if (state.status !== 'ready' || state.sending) {
+      if (state.status !== 'ready' || state.sending || !state.session.canSend) {
         return;
       }
       const sessionId = state.session.id;
@@ -58,28 +93,27 @@ export function useDogChat(dogId: string) {
         const clientMessageId = generateClientMessageId();
         const { data: userMessage } = await sendChatMessage(sessionId, clientMessageId, text);
         setState(prev => (prev.status === 'ready' ? { ...prev, messages: [...prev.messages, userMessage] } : prev));
-
         // Blocks until the AI call finishes (or fails) server-side — no polling.
-        const { data: result } = await requestChatReply(sessionId, userMessage.id);
-        setState(prev => {
-          if (prev.status !== 'ready') {
-            return prev;
-          }
-          const messages = result.reply ? [...prev.messages, result.reply] : prev.messages;
-          return {
-            ...prev,
-            messages,
-            sending: false,
-            sendError: result.reply ? null : result.failureCode ?? '답변을 받지 못했어요',
-          };
-        });
+        await requestReply(sessionId, userMessage, false);
       } catch (err) {
         const message = err instanceof ApiError ? err.message : String(err);
         setState(prev => (prev.status === 'ready' ? { ...prev, sending: false, sendError: message } : prev));
       }
     },
-    [state],
+    [state, requestReply],
   );
 
-  return { state, send };
+  const retrySend = useCallback(() => {
+    if (state.status !== 'ready' || state.sending || !state.retryableMessageId) {
+      return;
+    }
+    const userMessage = state.messages.find(m => m.id === state.retryableMessageId);
+    if (!userMessage) {
+      return;
+    }
+    setState(prev => (prev.status === 'ready' ? { ...prev, sending: true, sendError: null } : prev));
+    requestReply(state.session.id, userMessage, true);
+  }, [state, requestReply]);
+
+  return { state, send, retrySend };
 }
