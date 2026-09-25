@@ -40,7 +40,7 @@ export function ShelterListScreen() {
         renderItem={({ item }: { item: Shelter }) => (
           <Pressable
             style={styles.card}
-            onPress={() => navigation.navigate('Game', { shelterId: item.id })}
+            onPress={() => navigation.navigate('Game', { shelterId: item.id, shelterName: item.name })}
           >
             <Text style={styles.name}>{item.name}</Text>
             <Text style={styles.meta}>{item.region} · 강아지 {item.dogCount}마리</Text>

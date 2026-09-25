@@ -15,7 +15,8 @@
 | F-06 | 로그인 화면 (이메일/비밀번호, Supabase Auth SDK 직접 호출) | [#4](https://github.com/kingluminance/shelter-connect-fe/pull/4) | ✅ |
 | F-07 | 강아지 소개서 화면 (사진 언락, 클립보드 디자인) | [#5](https://github.com/kingluminance/shelter-connect-fe/pull/5) | ✅ |
 | F-09 | 코드 리뷰 발견 버그 수정 (BACK_OFF 타겟/쿨다운, 채팅 로그인 복귀) | [#6](https://github.com/kingluminance/shelter-connect-fe/pull/6) | ✅ |
-| F-10 | 강아지 행동 에셋 8종 v1 원본 자료 추가 (아직 미연동) | - | 🔎 리뷰 대기 |
+| F-10 | 강아지 행동 에셋 8종 v1 원본 자료 추가 (아직 미연동) | [#9](https://github.com/kingluminance/shelter-connect-fe/pull/9) | ✅ |
+| F-11 | 채팅 화면을 프로토타입 HTML(pet-chat-section.html)과 픽셀 단위로 맞춤 (lucide 아이콘, real-v1 정원 배경 에셋, 반응형 compact 브레이크포인트) | - | 🔎 리뷰 대기 |
 
 > ⚠️ 이 표의 `F-XX`는 이 레포(프론트) 안에서만 순서대로 매긴 번호다. 노션의 작업 보드가 별도로 쓰는
 > `F-XX` 번호(예: 노션 F-06 = 사진/프로필, F-07 = 로그인)와 **우연히 겹치지만 다른 체계**다 — 팀 리뷰
