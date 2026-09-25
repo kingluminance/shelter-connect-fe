@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useNavigation, useRoute, type NavigationProp, type RouteProp } from '@react-navigation/native';
-import { Canvas, FilterMode, Image as SkiaImage, useImage } from '@shopify/react-native-skia';
+import { Canvas, Circle, FilterMode, Image as SkiaImage, useImage } from '@shopify/react-native-skia';
 import { groundImage, mapLayout, propImages, reedsSheet, grassSheet, waterFullMapFrames } from './core/assets/maps/sunnyMeadow';
 import {
   PLAYER_FRAME_SIZE,
@@ -20,7 +20,14 @@ import {
 } from './core/assets/dog/dogWalkAtlas';
 import { usePropImages } from './core/assets/usePropImages';
 import { SpriteFrame } from './core/entities/SpriteFrame';
-import { createDogAgent, tickDog, type DogAgent } from './core/systems/dogStateMachine';
+import { createDogAgent, tickDog, type DogAgent, type DogState } from './core/systems/dogStateMachine';
+import {
+  createBallPlayState,
+  isBallPlayActive,
+  throwBall,
+  tickBallPlay,
+  type BallPlayState,
+} from './core/systems/ballPlay';
 import { stepMovement } from './core/systems/movement';
 import { Joystick } from './input/Joystick';
 import { useShelterDogs, type DogWithBehavior } from '../dog/hooks/useShelterDogs';
@@ -47,6 +54,11 @@ const PLAYER_ANIM_FRAME_MS = 90;
 const PLAYER_WALK_SEQUENCE = [0, 1, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1];
 // How close the player needs to be to a dog before "talk" shows up, in map units.
 const TALK_RANGE = 40;
+// How close the player needs to be to a ball-chasing dog before "throw" shows up,
+// and how far a throw itself travels — both in map units.
+const THROW_RANGE = 60;
+const THROW_DISTANCE = 40;
+const BALL_DISPLAY_RADIUS = 4;
 
 function clamp(value: number, min: number, max: number) {
   if (max < min) {
@@ -62,14 +74,18 @@ interface DogFacing {
 
 const DEFAULT_DOG_FACING: DogFacing = { direction: DogDirection.FRONT, flipX: false };
 
-// Heading toward the dog's current target — ambiguous/idle ticks (no target, or
-// barely moving) keep the last facing instead of snapping back to front.
-function nextDogFacing(agent: DogAgent, previous: DogFacing): DogFacing {
-  if (!agent.target) {
+// Heading toward a target point — ambiguous/idle ticks (no target, or barely moving)
+// keep the last facing instead of snapping back to front. Takes a plain position
+// rather than DogAgent so ball-play (chasing the ball, then the player) can reuse it.
+function nextDogFacing(
+  pos: { x: number; y: number; target: { x: number; y: number } | null },
+  previous: DogFacing,
+): DogFacing {
+  if (!pos.target) {
     return previous;
   }
-  const dx = agent.target.x - agent.x;
-  const dy = agent.target.y - agent.y;
+  const dx = pos.target.x - pos.x;
+  const dy = pos.target.y - pos.y;
   if (Math.abs(dx) > Math.abs(dy) * 1.2) {
     return { direction: DogDirection.SIDE, flipX: dx < 0 };
   }
@@ -77,6 +93,12 @@ function nextDogFacing(agent: DogAgent, previous: DogFacing): DogFacing {
     return { direction: dy > 0 ? DogDirection.FRONT : DogDirection.REAR, flipX: previous.flipX };
   }
   return previous;
+}
+
+// GRABBING/DROPPING have no dedicated art either — borrow SNIFF's head-down idle
+// column since a dog biting/dropping a ball reads reasonably close to that pose.
+function ballPoseState(phase: BallPlayState['phase']): DogState {
+  return phase === 'GRABBING' || phase === 'DROPPING' ? 'SNIFF' : 'IDLE';
 }
 
 // ponytail: JS-thread requestAnimationFrame loop, not a Reanimated UI-thread worklet —
@@ -119,6 +141,8 @@ export function GameScreen() {
   const direction = useRef({ dx: 0, dy: 0 });
   const playerPosRef = useRef(mapLayout.spawn);
   const dogFacingRef = useRef<DogFacing[]>([]);
+  const ballStatesRef = useRef<BallPlayState[]>([]);
+  const lastDirectionRef = useRef({ dx: 0, dy: 1 }); // toward the viewer by default — where to aim a throw
 
   // Spawn one dog per slot once the shelter's dogs + behavior settings arrive.
   useEffect(() => {
@@ -130,6 +154,7 @@ export function GameScreen() {
           return createDogAgent(slot.x, slot.y);
         }),
       );
+      ballStatesRef.current = shelterDogs.dogs.map(() => createBallPlayState());
     }
   }, [shelterDogs]);
 
@@ -150,6 +175,9 @@ export function GameScreen() {
         facingLeft.current = dx < 0;
       }
       if (isMoving.current) {
+        lastDirectionRef.current = { dx, dy };
+      }
+      if (isMoving.current) {
         const speed = Math.hypot(dx, dy) > 0.8 ? PLAYER_SPEED * RUN_MULTIPLIER : PLAYER_SPEED;
         const moved = stepMovement({
           x: playerPosRef.current.x,
@@ -167,21 +195,39 @@ export function GameScreen() {
       }
 
       setDogs(prevDogs => {
-        const nextDogs = prevDogs.map((agent, i) =>
-          dogMeta[i]
-            ? tickDog(
-                agent,
-                dogMeta[i].behavior.settings,
-                dt,
-                playerPosRef.current,
-                mapLayout.bounds,
-                mapLayout.obstacles,
-              )
-            : agent,
-        );
-        dogFacingRef.current = nextDogs.map((agent, i) =>
-          nextDogFacing(agent, dogFacingRef.current[i] ?? DEFAULT_DOG_FACING),
-        );
+        const nextDogs = prevDogs.map((agent, i) => {
+          if (!dogMeta[i]) {
+            return agent;
+          }
+          const settings = dogMeta[i].behavior.settings;
+          const ball = ballStatesRef.current[i] ?? createBallPlayState();
+          // Ball-play and the wandering FSM never drive the same dog in the same
+          // tick ("공놀이 중에는 배회 선택을 멈추고") — tickDog just doesn't run
+          // while a throw is in progress, and resumes wherever it left off after.
+          if (isBallPlayActive(ball)) {
+            const result = tickBallPlay(
+              ball,
+              { x: agent.x, y: agent.y },
+              settings,
+              playerPosRef.current,
+              dt,
+              mapLayout.bounds,
+              mapLayout.obstacles,
+            );
+            ballStatesRef.current[i] = result.state;
+            return { ...agent, x: result.dogPos.x, y: result.dogPos.y };
+          }
+          return tickDog(agent, settings, dt, playerPosRef.current, mapLayout.bounds, mapLayout.obstacles);
+        });
+        dogFacingRef.current = nextDogs.map((agent, i) => {
+          const ball = ballStatesRef.current[i];
+          const previous = dogFacingRef.current[i] ?? DEFAULT_DOG_FACING;
+          if (ball && isBallPlayActive(ball)) {
+            const target = ball.phase === 'RETURNING' ? playerPosRef.current : { x: ball.ballX, y: ball.ballY };
+            return nextDogFacing({ x: agent.x, y: agent.y, target }, previous);
+          }
+          return nextDogFacing(agent, previous);
+        });
         return nextDogs;
       });
 
@@ -258,14 +304,22 @@ export function GameScreen() {
   // Talk target: the nearest dog within range.
   let talkTargetIndex: number | null = null;
   let talkTargetDist = TALK_RANGE;
+  // Throw target: the nearest dog within range that's set up to chase and isn't
+  // already mid-fetch.
+  let throwTargetIndex: number | null = null;
+  let throwTargetDist = THROW_RANGE;
 
   if (dogSheet) {
     dogs.forEach((dog, i) => {
       const identity = i % DOG_IDENTITY_COUNT;
-      const moving = dog.state === 'WALK' || dog.state === 'RUN' || dog.state === 'BACK_OFF';
+      const ball = ballStatesRef.current[i];
+      const ballActive = ball ? isBallPlayActive(ball) : false;
+      const moving = ballActive
+        ? ball!.phase === 'CHASING' || ball!.phase === 'RETURNING'
+        : dog.state === 'WALK' || dog.state === 'RUN' || dog.state === 'BACK_OFF';
       const facing = dogFacingRef.current[i] ?? DEFAULT_DOG_FACING;
       const row = moving ? dogWalkRow(identity, facing.direction) : dogIdleRow(identity);
-      const col = moving ? animFrame : dogIdleColumn(dog.state, animFrame);
+      const col = moving ? animFrame : dogIdleColumn(ballActive ? ballPoseState(ball!.phase) : dog.state, animFrame);
       sceneEntities.push({
         depth: dog.y,
         node: (
@@ -283,10 +337,32 @@ export function GameScreen() {
         ),
       });
 
+      if (ball && isBallPlayActive(ball)) {
+        sceneEntities.push({
+          depth: ball.ballY,
+          node: (
+            <Circle
+              key={`ball-${dogMeta[i]?.id ?? i}`}
+              cx={toScreenX(ball.ballX)}
+              cy={toScreenY(ball.ballY)}
+              r={BALL_DISPLAY_RADIUS * scale}
+              color="#d9a441"
+            />
+          ),
+        });
+      }
+
       const dist = Math.hypot(dog.x - player.x, dog.y - player.y);
       if (dist < talkTargetDist) {
         talkTargetDist = dist;
         talkTargetIndex = i;
+      }
+
+      if (!ballActive && dogMeta[i]?.behavior.settings.ballPlay.chaseEnabled) {
+        if (dist < throwTargetDist) {
+          throwTargetDist = dist;
+          throwTargetIndex = i;
+        }
       }
     });
   }
@@ -303,7 +379,31 @@ export function GameScreen() {
       dogId: dog.id,
       dogName: dog.name,
       identityIndex: talkTargetIndex % DOG_IDENTITY_COUNT,
-    });
+    if (throwTargetIndex === null) {
+      return;
+    }
+    const meta = dogMeta[throwTargetIndex];
+    if (!meta) {
+      return;
+    }
+    const { dx, dy } = lastDirectionRef.current;
+    const len = Math.hypot(dx, dy) || 1;
+    const targetX = clamp(
+      playerPosRef.current.x + (dx / len) * THROW_DISTANCE,
+      mapLayout.bounds.left,
+      mapLayout.bounds.right,
+    );
+    const targetY = clamp(
+      playerPosRef.current.y + (dy / len) * THROW_DISTANCE,
+      mapLayout.bounds.top,
+      mapLayout.bounds.bottom,
+    );
+    ballStatesRef.current[throwTargetIndex] = throwBall(
+      ballStatesRef.current[throwTargetIndex] ?? createBallPlayState(),
+      targetX,
+      targetY,
+      meta.behavior.settings.ballPlay,
+    );
   }
 
   if (playerSheet) {
@@ -385,6 +485,11 @@ export function GameScreen() {
             <Text style={styles.talkButtonText}>말 걸기</Text>
           </Pressable>
         )}
+        {throwTargetIndex !== null && (
+          <Pressable style={styles.throwButton} onPress={handleThrow}>
+            <Text style={styles.throwButtonText}>공 던지기</Text>
+          </Pressable>
+        )}
         {shelterDogs.status === 'loading' && (
           <View style={styles.statusBanner}>
             <ActivityIndicator color="#fff" />
@@ -420,7 +525,22 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
   },
+  // Stacked above talkButton — a dog can be both chat-approachable and
+  // chase-enabled at once, so both buttons may show together.
+  throwButton: {
+    position: 'absolute',
+    right: 16,
+    bottom: 88,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
   talkButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  throwButtonText: {
     color: '#fff',
     fontWeight: '600',
   },
