@@ -57,6 +57,58 @@ test('backs off once inside personal space, after the reaction delay, when BACK_
   expect(agent.state).toBe('BACK_OFF');
 });
 
+test('actually moves away from the player while backing off (target survives enterState)', () => {
+  const settings = makeSettings({
+    approachDistanceTiles: 4,
+    personalSpaceTiles: 1.5,
+    reactionDelayMs: 100,
+    actions: {
+      ...makeSettings().actions,
+      BACK_OFF: { weight: 10, speedTilesPerSecond: 0.6, minDurationMs: 500, maxDurationMs: 1500, cooldownMs: 3000 },
+    },
+  });
+  let agent = createDogAgent(100, 100);
+  const closePlayer = { x: 110, y: 100 };
+  for (let i = 0; i < 3; i++) {
+    agent = tickDog(agent, settings, 0.1, closePlayer, bounds, noObstacles);
+  }
+  expect(agent.state).toBe('BACK_OFF');
+  const before = { x: agent.x, y: agent.y };
+  agent = tickDog(agent, settings, 0.1, closePlayer, bounds, noObstacles);
+  expect(distanceMoved(before, agent)).toBeGreaterThan(0);
+  // Moving away from the player, not toward.
+  expect(agent.x).toBeLessThan(before.x);
+});
+
+test('does not re-enter BACK_OFF while its cooldown is still active', () => {
+  const settings = makeSettings({
+    approachDistanceTiles: 4,
+    personalSpaceTiles: 1.5,
+    reactionDelayMs: 100,
+    actions: {
+      ...makeSettings().actions,
+      BACK_OFF: { weight: 10, speedTilesPerSecond: 0.6, minDurationMs: 100, maxDurationMs: 100, cooldownMs: 999999 },
+    },
+  });
+  let agent = createDogAgent(100, 100);
+  const closePlayer = { x: 110, y: 100 };
+  // Trigger BACK_OFF once, then let it finish (player steps just outside personalSpace).
+  for (let i = 0; i < 3; i++) {
+    agent = tickDog(agent, settings, 0.1, closePlayer, bounds, noObstacles);
+  }
+  expect(agent.state).toBe('BACK_OFF');
+  const farEnoughPlayer = { x: 200, y: 100 };
+  agent = tickDog(agent, settings, 0.1, farEnoughPlayer, bounds, noObstacles);
+  expect(agent.state).not.toBe('BACK_OFF'); // exited, cooldown now set to 999999ms
+
+  // Player closes back in immediately — should NOT re-trigger BACK_OFF despite
+  // clearing reactionDelayMs again, because cooldownMs hasn't elapsed.
+  for (let i = 0; i < 5; i++) {
+    agent = tickDog(agent, settings, 0.1, closePlayer, bounds, noObstacles);
+  }
+  expect(agent.state).not.toBe('BACK_OFF');
+});
+
 test('an action on cooldown is not reselected until its cooldown expires', () => {
   const settings = makeSettings({
     actions: {

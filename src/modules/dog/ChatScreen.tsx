@@ -28,7 +28,7 @@ export function ChatScreen() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { params } = useRoute<RouteProp<RootStackParamList, 'Chat'>>();
   const dogSheet = useImage(dogWalkAtlas);
-  const { state, send } = useDogChat(params.dogId);
+  const { state, send, retrySend } = useDogChat(params.dogId);
   const [draft, setDraft] = useState('');
   const [pendingQuestions, setPendingQuestions] = useState<string[]>([]);
   const [notebookOpen, setNotebookOpen] = useState(false);
@@ -39,7 +39,7 @@ export function ChatScreen() {
 
   function submit(text: string) {
     const trimmed = text.trim();
-    if (!trimmed || state.status !== 'ready' || state.sending) {
+    if (!trimmed || state.status !== 'ready' || state.sending || !state.session.canSend) {
       return;
     }
     send(trimmed);
@@ -110,6 +110,11 @@ export function ChatScreen() {
                       : latestAssistant?.text ?? `${params.dogName}에게 말을 걸어보세요.`}
                   </Text>
                   {state.sendError && <Text style={styles.errorText}>{state.sendError}</Text>}
+                  {state.retryableMessageId && (
+                    <Pressable onPress={retrySend} disabled={state.sending}>
+                      <Text style={styles.loginCta}>다시 시도</Text>
+                    </Pressable>
+                  )}
                 </>
               )}
             </View>
@@ -120,11 +125,20 @@ export function ChatScreen() {
           <>
             <View style={styles.topics}>
               {QUICK_TOPICS.map(topic => (
-                <Pressable key={topic} style={styles.topicButton} onPress={() => submit(topic)} disabled={state.sending}>
+                <Pressable
+                  key={topic}
+                  style={styles.topicButton}
+                  onPress={() => submit(topic)}
+                  disabled={state.sending || !state.session.canSend}
+                >
                   <Text style={styles.topicText}>{topic}</Text>
                 </Pressable>
               ))}
             </View>
+
+            {!state.session.canSend && (
+              <Text style={styles.errorText}>지금은 이 강아지와 대화할 수 없어요.</Text>
+            )}
 
             <View style={styles.composer}>
               <TextInput
@@ -134,10 +148,14 @@ export function ChatScreen() {
                 placeholder="궁금한 걸 직접 물어봐"
                 placeholderTextColor="#806a4f"
                 maxLength={300}
-                editable={!state.sending}
+                editable={!state.sending && state.session.canSend}
                 onSubmitEditing={() => submit(draft)}
               />
-              <Pressable style={styles.sendButton} onPress={() => submit(draft)} disabled={state.sending}>
+              <Pressable
+                style={styles.sendButton}
+                onPress={() => submit(draft)}
+                disabled={state.sending || !state.session.canSend}
+              >
                 <Text style={styles.sendButtonText}>↑</Text>
               </Pressable>
             </View>

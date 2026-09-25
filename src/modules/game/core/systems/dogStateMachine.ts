@@ -99,7 +99,15 @@ function enterState(
 ): DogAgent {
   const action = settings.actions[state];
   const duration = action.minDurationMs + rng() * Math.max(0, action.maxDurationMs - action.minDurationMs);
-  const target = state === 'WALK' || state === 'RUN' ? randomTargetWithin(bounds, rng) : null;
+  // BACK_OFF's caller pre-computes a flee-from-player target on `agent` before calling
+  // this — preserve it. Everything else either wanders to a fresh random point
+  // (WALK/RUN) or plants in place (null).
+  const target =
+    state === 'WALK' || state === 'RUN'
+      ? randomTargetWithin(bounds, rng)
+      : state === 'BACK_OFF'
+        ? agent.target
+        : null;
   return { ...agent, state, target, stateRemainingMs: duration };
 }
 
@@ -140,22 +148,29 @@ export function tickDog(
     } else if (next.reactionPendingMs !== null) {
       const remaining = next.reactionPendingMs - dtMs;
       if (remaining <= 0) {
-        next = enterState(
-          desiredReaction === 'BACK_OFF'
-            ? {
-                ...next,
-                target: {
-                  x: next.x + (next.x - player.x),
-                  y: next.y + (next.y - player.y),
-                },
-              }
-            : next,
-          desiredReaction,
-          settings,
-          bounds,
-          rng,
-        );
+        // The reaction path never consulted cooldownUntilMs, so a dog could back off,
+        // immediately re-enter cooldown, and re-trigger BACK_OFF on the very next
+        // reactionDelayMs tick as long as the player stayed close — cooldown never
+        // actually cooled anything down. Gate entry on it like the autonomous path does.
+        const onCooldown = (next.cooldownUntilMs[desiredReaction] ?? 0) > next.clockMs;
         next = { ...next, reactionPendingMs: null, reactionTarget: null };
+        if (!onCooldown) {
+          next = enterState(
+            desiredReaction === 'BACK_OFF'
+              ? {
+                  ...next,
+                  target: {
+                    x: next.x + (next.x - player.x),
+                    y: next.y + (next.y - player.y),
+                  },
+                }
+              : next,
+            desiredReaction,
+            settings,
+            bounds,
+            rng,
+          );
+        }
       } else {
         next = { ...next, reactionPendingMs: remaining };
       }
