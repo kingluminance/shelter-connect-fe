@@ -33,13 +33,15 @@
 (`{dogId, dogName, identityIndex}`, 공놀이 던지기 버튼과 같은 근접-감지 패턴).
 
 ## 알려진 제약 (테스트 전 필수 확인)
-- **로그인 미구현**: `SUPABASE_ANON_KEY`가 비어 있어 모든 요청이 토큰 없이 나감 → 실제 배포 서버는
-  대화 API 전부 `401 UNAUTHENTICATED`. `useDogChat`은 이 경우 `status: 'error'`로 빠지고 화면에
-  에러 메시지를 보여줌(크래시 아님) — 로그인 붙기 전까지는 여기서 막히는 게 정상.
-- **`AI_ENABLED=false`**: 로그인이 됐다 쳐도 3번(`/reply`)은 `503 AI_NOT_CONFIGURED`. `sendError`로
-  표시됨.
-- 두 제약 다 CLAUDE.md "확인 필요한 미결 사항"에 이미 기록된 것 — 이 화면이 깨진 게 아니라 백엔드/설정
-  쪽에서 풀려야 실제로 끝까지 테스트 가능.
+- **로그인 구현됨**: `LoginScreen`(이메일/비밀번호, Supabase Auth SDK 직접 호출, [#4](https://github.com/kingluminance/shelter-connect-fe/pull/4))
+  + 실제 `SUPABASE_ANON_KEY`가 `.env`에 설정됨. 토큰 없이 대화 API를 부르면 여전히 서버가
+  `401 UNAUTHENTICATED`를 반환하고 `useDogChat`이 `status: 'error'`로 빠지지만, 이제 화면에서
+  "로그인하기" 버튼으로 이동 → 로그인 후 돌아오면 같은 화면이 포커스를 다시 받아 세션을 재오픈한다
+  (`useFocusEffect` 기반, [#6](https://github.com/kingluminance/shelter-connect-fe/pull/6)) — 예전처럼
+  이전 에러가 남아있지 않음.
+- **`AI_ENABLED` 서버 설정 여부(확인 필요)**: 꺼져 있으면 로그인이 됐어도 `/reply`가
+  `503 AI_NOT_CONFIGURED`를 반환하고 `sendError`로 표시됨. 실제로 꺼져 있는지는 이번 턴에 재확인하지
+  않음 — 대화 테스트 시 이 실패가 뜨면 백엔드 설정 문제인지부터 확인할 것.
 
 ## 테스트
 `clientId.test.ts` — 메시지 idempotency 키(`clientMessageId`) 생성 포맷만 검증. `useDogChat`

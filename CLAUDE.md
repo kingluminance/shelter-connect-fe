@@ -63,11 +63,12 @@ cd ios && pod install   # 네이티브 의존성 변경 후
   이 환경(RN 0.87 + Fabric + react-native-screens native-stack)에서 부모/자식이 동일 style
   객체 참조를 공유하면 `<Text>`가 화면에 전혀 그려지지 않는(배경은 정상, 글자만 안 보이는)
   버그가 재현됨. `StyleSheet.create`든 인라인 객체든 상관없이, 컴포넌트마다 별개의 객체를 쓸 것.
-- **`__tests__/App.test.tsx` (RN 기본 스모크 테스트)는 현재 실패함** — reanimated 4.7 / worklets 0.13
-  조합에서 jest용 mock(`mock.js`)이 자체적으로 깨져있음(`setCSSEventHandler`가 JSReanimated에 없다는
-  내부 에러). worklets는 `__mocks__/react-native-worklets.js`로 스텁 처리해서 앞부분은 통과하지만
-  reanimated 쪽 mock 내부 버그까지는 못 고침 — 업스트림 이슈. `tsc`/`lint`는 정상, PR 게이트는 그 둘만
-  요구하므로 당장 막히진 않음. reanimated가 업데이트되면 재확인.
+- **`__tests__/App.test.tsx` (RN 기본 스모크 테스트)는 현재 실패함** — `react-native-url-polyfill/auto`가
+  ESM(`import`)으로 작성돼 있어 jest 변환 없이 그대로 require되면서 "Cannot use import statement
+  outside a module"로 실패함(`supabase.ts` → `apiClient.ts` → 화면 체인을 타고 `App.tsx`에서 로드).
+  Node 22.23.2에서도 동일 — 팀 코드 리뷰(2026.09.25)에서 재확인. (이전에 reanimated/worklets mock 버그로
+  기록했던 건 오진 — 실제 원인은 이거였음.) `tsc`/`lint`는 정상, PR 게이트는 그 둘만 요구하므로 당장
+  막히진 않음. 고치려면 jest `transformIgnorePatterns`에 `react-native-url-polyfill` 추가 필요.
 
 ## 확인 필요한 미결 사항
 [docs/project-overview.md](./docs/project-overview.md) 하단 "확인 필요" 섹션 참고 — 스프라이트 규격,
