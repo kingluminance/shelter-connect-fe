@@ -25,7 +25,7 @@ export type RootStackParamList = {
 };
 
 /** For screens that live inside MainTabs but still need to push a root-stack route
- * (Game/Login/...) or switch to a sibling tab — e.g. HomeScreen, ShelterListScreen. */
+ * (Game/Login/...) or switch to a sibling tab — e.g. HomeScreen, ShelterTabScreen. */
 export type HomeTabScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList>,
   NativeStackNavigationProp<RootStackParamList>

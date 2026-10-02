@@ -8,3 +8,17 @@ export function fetchSavedDogs(params?: { limit?: number; cursor?: string }) {
   const qs = query.toString();
   return apiFetch<Page<SavedDog>>(`/v1/me/saved-dogs${qs ? `?${qs}` : ''}`);
 }
+
+export function fetchDogSaved(dogId: string) {
+  return apiFetch<{ data: { dogId: string; saved: boolean } }>(`/v1/me/saved-dogs/${dogId}`);
+}
+
+// Idempotent — repeated saves keep the original order.
+export function saveDog(dogId: string) {
+  return apiFetch<unknown>(`/v1/me/saved-dogs/${dogId}`, { method: 'PUT' });
+}
+
+// Only removes the saved flag; chat history and adoption notes stay.
+export function unsaveDog(dogId: string) {
+  return apiFetch<unknown>(`/v1/me/saved-dogs/${dogId}`, { method: 'DELETE' });
+}

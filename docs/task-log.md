@@ -23,6 +23,7 @@
 | F-14 | Android 배포 서명을 개발용 공개 키와 분리하고 잘못된 배포 차단 | [#13](https://github.com/kingluminance/shelter-connect-fe/pull/13) | 🔎 리뷰 대기 |
 | F-15 | Figma 리디자인 — 5탭 바텀 네비게이션 셸 + 홈 화면(보호소 입장 카드/마음에 담은 친구/동네 커뮤니티 미리보기), 실제 API 연동(`/v1/me/preferences`, `/v1/me/saved-dogs`, `/community/posts`) | [#15](https://github.com/kingluminance/shelter-connect-fe/pull/15) | ✅ |
 | F-16 | 홈/보호소 탭 로그인 진입 수정 (보호소 탭 로그인 링크 상태바 가림, 홈 프로필 버튼 로그인/로그아웃) | - | 🔎 리뷰 대기 |
+| F-17 | 보호소 탭(주변 보호소·기준 위치·검색·선택/변경) + 저장한 친구 탭(검색·필터·저장 해제) Figma 적용, 채팅 화면 저장 하트, `@react-native-community/geolocation` 추가 (`/v1/shelter-discovery`, `/v1/me/saved-dogs`, `/v1/me/preferences`) | - | 🔎 리뷰 대기 |
 
 > ⚠️ 이 표의 `F-XX`는 이 레포(프론트) 안에서만 순서대로 매긴 번호다. 노션의 작업 보드가 별도로 쓰는
 > `F-XX` 번호(예: 노션 F-06 = 사진/프로필, F-07 = 로그인)와 **우연히 겹치지만 다른 체계**다 — 팀 리뷰

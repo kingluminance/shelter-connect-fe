@@ -33,6 +33,7 @@ import { SpriteFrame } from '../game/core/entities/SpriteFrame';
 import { DOG_FRAME_SIZE, dogIdleRow, dogWalkAtlas } from '../game/core/assets/dog/dogWalkAtlas';
 import { chatRoomBackground, CHAT_ROOM_ASPECT_RATIO } from './assets/chatRoomBackground';
 import { useDogChat } from './hooks/useDogChat';
+import { useDogSaved } from './hooks/useDogSaved';
 import type { RootStackParamList } from '../../app/navigation';
 
 // Mirrors HANN-Creator/shelter-connect's own prototype
@@ -58,6 +59,7 @@ export function ChatScreen() {
   const dogSheet = useImage(dogWalkAtlas);
   const chatRoomImage = useImage(chatRoomBackground);
   const { state, send, retrySend } = useDogChat(params.dogId);
+  const dogSaved = useDogSaved(params.dogId);
   const [draft, setDraft] = useState('');
   const [pendingQuestions, setPendingQuestions] = useState<string[]>([]);
   const [notebookOpen, setNotebookOpen] = useState(false);
@@ -187,7 +189,13 @@ export function ChatScreen() {
                   )}
                 </>
               )}
-              <Text style={styles.dialogueHeart}>♥</Text>
+              <Pressable
+                style={styles.saveButton}
+                hitSlop={10}
+                onPress={() => (dogSaved.needsLogin ? navigation.navigate('Login') : dogSaved.toggle())}
+              >
+                <Text style={styles.dialogueHeart}>{dogSaved.saved ? '♥' : '♡'}</Text>
+              </Pressable>
             </View>
           </View>
         </View>
@@ -450,11 +458,14 @@ function createStyles(compact: boolean, insetTop: number, insetBottom: number) {
       lineHeight: 22,
       color: '#514834',
     },
-    dialogueHeart: {
+    saveButton: {
       position: 'absolute',
-      bottom: 7,
-      right: 12,
-      fontSize: 12,
+      bottom: 4,
+      right: 8,
+      paddingHorizontal: 4,
+    },
+    dialogueHeart: {
+      fontSize: 16,
       color: '#b95472',
     },
     loginCta: {

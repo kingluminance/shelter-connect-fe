@@ -9,7 +9,7 @@ export type CurrentShelterState = { status: 'loading' } | { status: 'ready'; she
 
 /** "현재 보호소" — logged-in users keep it server-side (/v1/me/preferences), signed-out
  * users keep a device-local stand-in (docs/personal-discovery-api.md: "비로그인 사용자의
- * 임시 보호소 선택은 기기에 보관한다"). Home's shelter-entrance card and ShelterListScreen's
+ * 임시 보호소 선택은 기기에 보관한다"). Home's shelter-entrance card and ShelterTabScreen's
  * card tap both read/write through this one hook. */
 export function useCurrentShelter() {
   const session = useAuthSession();

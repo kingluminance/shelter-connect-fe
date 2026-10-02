@@ -17,6 +17,20 @@ export interface ShelterDetail extends Shelter {
   websiteUrl: string | null;
 }
 
+// docs/personal-discovery-api.md — GET /v1/shelter-discovery. distanceMeters is null unless
+// the request carried a reference latitude/longitude (or this shelter has no coordinates).
+export interface ShelterDiscoveryItem {
+  id: string;
+  name: string;
+  region: string;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  distanceMeters: number | null;
+  mapKey: string;
+  dogCount: number;
+}
+
 export type AdoptionStatus = 'AVAILABLE' | 'IN_PROGRESS' | 'ADOPTED' | 'PAUSED';
 
 export interface DogSummary {
