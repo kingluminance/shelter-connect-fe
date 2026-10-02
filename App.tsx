@@ -16,6 +16,7 @@ import { GameScreen } from './src/modules/game/GameScreen';
 import { LoginScreen } from './src/modules/auth/LoginScreen';
 import { SignUpScreen } from './src/modules/auth/SignUpScreen';
 import { LoginGuideScreen } from './src/modules/auth/LoginGuideScreen';
+import { InquiryRoomScreen } from './src/modules/inquiry/InquiryRoomScreen';
 import { onAuthExpired } from './src/shared/lib/authExpired';
 import type { RootStackParamList } from './src/app/navigation';
 
@@ -52,6 +53,7 @@ function App() {
               component={LoginGuideScreen}
               options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }}
             />
+            <Stack.Screen name="InquiryRoom" component={InquiryRoomScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: '소개서' }} />
           </Stack.Navigator>
         </NavigationContainer>

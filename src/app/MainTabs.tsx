@@ -5,6 +5,7 @@ import { HomeScreen } from '../modules/home/HomeScreen';
 import { ShelterTabScreen } from '../modules/dog/ShelterTabScreen';
 import { SavedFriendsScreen } from '../modules/dog/SavedFriendsScreen';
 import { SettingsScreen } from '../modules/auth/SettingsScreen';
+import { ConversationsScreen } from '../modules/conversations/ConversationsScreen';
 import { fonts } from '../shared/lib/fonts';
 import { HomeSvg } from '../modules/home/components/HomeSvg';
 import type { svgAssets } from '../modules/home/assets/svgAssets';
@@ -86,7 +87,7 @@ export function MainTabs() {
       <Tab.Screen name="커뮤니티">{() => <PlaceholderScreen label="커뮤니티" />}</Tab.Screen>
       <Tab.Screen name="저장한 친구" component={SavedFriendsScreen} />
       <Tab.Screen name="내 정보" component={SettingsScreen} />
-      <Tab.Screen name="대화">{() => <PlaceholderScreen label="대화" />}</Tab.Screen>
+      <Tab.Screen name="대화" component={ConversationsScreen} />
     </Tab.Navigator>
   );
 }
