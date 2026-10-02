@@ -6,6 +6,7 @@ import { ShelterTabScreen } from '../modules/dog/ShelterTabScreen';
 import { SavedFriendsScreen } from '../modules/dog/SavedFriendsScreen';
 import { SettingsScreen } from '../modules/auth/SettingsScreen';
 import { ConversationsScreen } from '../modules/conversations/ConversationsScreen';
+import { CommunityScreen } from '../modules/community/CommunityScreen';
 import { fonts } from '../shared/lib/fonts';
 import { HomeSvg } from '../modules/home/components/HomeSvg';
 import type { svgAssets } from '../modules/home/assets/svgAssets';
@@ -61,14 +62,6 @@ function PuppyConnectTabBar({ state, descriptors, navigation }: BottomTabBarProp
   );
 }
 
-function PlaceholderScreen({ label }: { label: string }) {
-  return (
-    <View style={styles.placeholder}>
-      <Text style={styles.placeholderText}>{label} 화면은 준비 중이에요</Text>
-    </View>
-  );
-}
-
 export function MainTabs() {
   return (
     <Tab.Navigator
@@ -84,7 +77,7 @@ export function MainTabs() {
     >
       <Tab.Screen name="홈" component={HomeScreen} />
       <Tab.Screen name="보호소" component={ShelterTabScreen} />
-      <Tab.Screen name="커뮤니티">{() => <PlaceholderScreen label="커뮤니티" />}</Tab.Screen>
+      <Tab.Screen name="커뮤니티" component={CommunityScreen} />
       <Tab.Screen name="저장한 친구" component={SavedFriendsScreen} />
       <Tab.Screen name="내 정보" component={SettingsScreen} />
       <Tab.Screen name="대화" component={ConversationsScreen} />
@@ -114,6 +107,4 @@ const styles = StyleSheet.create({
   tabInnerFocused: { backgroundColor: '#f0e6f4' },
   tabLabel: { fontFamily: fonts.pixel, fontSize: 8.5, color: '#ada8b1' },
   tabLabelFocused: { color: '#8c789d' },
-  placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fcf9f0' },
-  placeholderText: { fontFamily: fonts.body, fontSize: 14, color: '#82949c' },
 });

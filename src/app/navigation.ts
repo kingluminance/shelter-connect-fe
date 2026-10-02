@@ -20,6 +20,9 @@ export type RootStackParamList = {
   SignUp: undefined;
   // Figma 17(로그인 안내)·19(로그인 만료) — 같은 시트, 문구만 다름.
   InquiryRoom: { roomId: string };
+  CommunityPost: { postId: string };
+  CommunityComments: { postId: string };
+  CommunityLocations: { postId: string };
   LoginGuide: { reason?: 'expired' } | undefined;
   Profile: {
     dogId: string;
