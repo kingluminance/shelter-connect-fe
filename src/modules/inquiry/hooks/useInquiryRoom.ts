@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { generateClientMessageId } from '../../../shared/lib/clientId';
 import { ApiError } from '../../../shared/lib/apiClient';
+import { writeErrorMessage } from '../../../shared/lib/communityErrors';
 import { fetchInquiryRoom } from '../api/rooms';
-import { fetchInquiryMessages, markInquiryRead, sendInquiryText } from '../api/messages';
+import { fetchInquiryMessages, markInquiryRead, sendInquiryAttachment, sendInquiryText, type InquiryAttachment } from '../api/messages';
 import { mergeMessages, newestSequence } from '../messages';
 import type { InquiryMessage, InquiryRoom } from '../types';
 
@@ -151,5 +152,22 @@ export function useInquiryRoom(roomId: string) {
     [state, transmit],
   );
 
-  return { state, send, retry, reload: load, loadOlder, loadingOlder };
+  /** Photo / location message — sent in one go (no pending bubble); resolves to an error message or null. */
+  const sendAttachment = useCallback(
+    async (attachment: InquiryAttachment): Promise<string | null> => {
+      try {
+        const { data } = await sendInquiryAttachment(roomId, generateClientMessageId(), attachment);
+        setState(prev => (prev.status === 'ready' ? { ...prev, messages: mergeMessages(prev.messages, [data]) } : prev));
+        return null;
+      } catch (err) {
+        if (err instanceof ApiError && err.code === 'INQUIRY_READ_ONLY') {
+          setState(prev => (prev.status === 'ready' ? { ...prev, room: { ...prev.room, canSend: false } } : prev));
+        }
+        return writeErrorMessage(err);
+      }
+    },
+    [roomId],
+  );
+
+  return { state, send, sendAttachment, retry, reload: load, loadOlder, loadingOlder };
 }

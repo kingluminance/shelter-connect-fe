@@ -23,6 +23,9 @@ export type RootStackParamList = {
   CommunityPost: { postId: string };
   CommunityComments: { postId: string };
   CommunityLocations: { postId: string };
+  // 글쓰기·수정(postId 있으면 수정/임시저장 이어쓰기), 목격 제보 작성 (F-21)
+  CommunityCompose: { postId?: string; category?: 'LOST' | 'FOUND' | 'NEIGHBOR_NEWS' } | undefined;
+  SightingCompose: { postId: string };
   LoginGuide: { reason?: 'expired' } | undefined;
   Profile: {
     dogId: string;

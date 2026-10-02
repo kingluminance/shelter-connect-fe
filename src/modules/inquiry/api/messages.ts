@@ -23,6 +23,18 @@ export function sendInquiryText(roomId: string, params: { clientMessageId: strin
   });
 }
 
+export type InquiryAttachment =
+  | { kind: 'IMAGE'; mediaId: string }
+  | { kind: 'LOCATION'; location: { label: string; latitude: number; longitude: number } };
+
+/** IMAGE (a `/community/media` id) or LOCATION (label + coordinates, both required) message. */
+export function sendInquiryAttachment(roomId: string, clientMessageId: string, attachment: InquiryAttachment) {
+  return apiFetch<{ data: InquiryMessage }>(`/v1/inquiry-rooms/${roomId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ clientMessageId, ...attachment }),
+  });
+}
+
 /** Call only after the messages were actually shown — a GET alone doesn't mark them read. */
 export function markInquiryRead(roomId: string, upToSequence: number) {
   return apiFetch<unknown>(`/v1/inquiry-rooms/${roomId}/read`, {

@@ -6,11 +6,14 @@ import { notifyAuthExpired } from './authExpired';
 export class ApiError extends Error {
   code: string;
   requestId: string;
+  /** HTTP status — 0 when no response arrived (NETWORK_ERROR). */
+  status: number;
 
-  constructor(code: string, message: string, requestId: string) {
+  constructor(code: string, message: string, requestId: string, status = 0) {
     super(message);
     this.code = code;
     this.requestId = requestId;
+    this.status = status;
   }
 }
 
@@ -29,7 +32,8 @@ export async function apiFetch<T>(
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
       headers: {
-        'Content-Type': 'application/json',
+        // multipart bodies need fetch to pick the Content-Type (it adds the boundary).
+        ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
       },
@@ -50,6 +54,7 @@ export async function apiFetch<T>(
       body?.code ?? 'UNKNOWN_ERROR',
       body?.message ?? response.statusText,
       body?.requestId ?? '',
+      response.status,
     );
   }
 

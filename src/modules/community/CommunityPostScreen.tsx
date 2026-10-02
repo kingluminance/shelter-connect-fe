@@ -10,6 +10,7 @@ import { RemoteImage } from '../../shared/ui/RemoteImage';
 import { useCommunityPost } from './hooks/useCommunityPost';
 import { useMediaUrl } from './hooks/useMediaUrl';
 import { describeApproxTime, shortRegion } from './postText';
+import { PostBottomActions, PostMenu } from './components/PostActions';
 import { PostChip } from './components/PostChip';
 import { ScreenFrame } from './components/ScreenFrame';
 import type { CommunityPost } from './types';
@@ -19,14 +20,14 @@ const PHOTO_WIDTH = 382;
 const PHOTO_HEIGHT = 226;
 
 // Figma "06 찾기 상세" / "07 발견 상세" (pencil ROGaD / SVGiW). The action buttons at the bottom
-// (목격 제보하기, 작성자에게 문의) are F-21.
+// (목격 제보하기, 작성자에게 문의) and the 더보기 menu are F-21.
 export function CommunityPostScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { params } = useRoute<RouteProp<RootStackParamList, 'CommunityPost'>>();
   const { state, reload } = useCommunityPost(params.postId);
 
   return (
-    <ScreenFrame title="동네 소식">
+    <ScreenFrame title="동네 소식" right={state.status === 'ready' ? <PostMenu post={state.post} onChanged={reload} /> : undefined}>
       {state.status === 'loading' && <ActivityIndicator style={styles.loading} />}
       {state.status === 'error' && (
         <ConnectionErrorView
@@ -152,6 +153,8 @@ function PostBody({ post, navigation }: { post: CommunityPost; navigation: Nativ
           <ChevronRight size={14} color="#aa99b5" strokeWidth={2} />
         </View>
       </Pressable>
+
+      <PostBottomActions post={post} />
 
       <Modal visible={zoom} transparent animationType="fade" onRequestClose={() => setZoom(false)}>
         <Pressable style={styles.zoomBackdrop} onPress={() => setZoom(false)}>

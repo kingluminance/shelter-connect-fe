@@ -20,6 +20,8 @@ import { InquiryRoomScreen } from './src/modules/inquiry/InquiryRoomScreen';
 import { CommunityPostScreen } from './src/modules/community/CommunityPostScreen';
 import { CommunityCommentsScreen } from './src/modules/community/CommunityCommentsScreen';
 import { CommunityLocationsScreen } from './src/modules/community/CommunityLocationsScreen';
+import { CommunityComposeScreen } from './src/modules/community/CommunityComposeScreen';
+import { SightingComposeScreen } from './src/modules/community/SightingComposeScreen';
 import { onAuthExpired } from './src/shared/lib/authExpired';
 import type { RootStackParamList } from './src/app/navigation';
 
@@ -60,6 +62,8 @@ function App() {
             <Stack.Screen name="CommunityPost" component={CommunityPostScreen} options={{ headerShown: false }} />
             <Stack.Screen name="CommunityComments" component={CommunityCommentsScreen} options={{ headerShown: false }} />
             <Stack.Screen name="CommunityLocations" component={CommunityLocationsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="CommunityCompose" component={CommunityComposeScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="SightingCompose" component={SightingComposeScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: '소개서' }} />
           </Stack.Navigator>
         </NavigationContainer>
