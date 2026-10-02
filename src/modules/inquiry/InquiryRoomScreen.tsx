@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
@@ -7,7 +7,11 @@ import { ChevronLeft, ChevronRight, MapPin, Paperclip, SendHorizontal, User } fr
 import { useMediaUrl } from '../community/hooks/useMediaUrl';
 import { formatClock, formatDayHeader, isSameDay } from '../../shared/lib/chatTime';
 import { fonts } from '../../shared/lib/fonts';
+import { getCurrentCoords, type Coords } from '../../shared/lib/deviceLocation';
 import { openInMaps } from '../../shared/lib/mapLinks';
+import { pickPhotos, uploadCommunityPhoto } from '../../shared/lib/photoUpload';
+import { writeErrorMessage } from '../../shared/lib/communityErrors';
+import { ActionSheet, PermissionSheet, SheetButton } from '../../shared/ui/ActionSheet';
 import { ConnectionErrorView } from '../../shared/ui/ConnectionErrorView';
 import { RemoteImage } from '../../shared/ui/RemoteImage';
 import { useInquiryRoom, type PendingMessage } from './hooks/useInquiryRoom';
@@ -28,9 +32,61 @@ export function InquiryRoomScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { params } = useRoute<RouteProp<RootStackParamList, 'InquiryRoom'>>();
-  const { state, send, retry, reload, loadOlder } = useInquiryRoom(params.roomId);
+  const { state, send, sendAttachment, retry, reload, loadOlder } = useInquiryRoom(params.roomId);
   const [draft, setDraft] = useState('');
   const listRef = useRef<FlatList<Row>>(null);
+  const [attachSheet, setAttachSheet] = useState(false);
+  const [photoDenied, setPhotoDenied] = useState(false);
+  const [locationDenied, setLocationDenied] = useState(false);
+  const [pendingCoords, setPendingCoords] = useState<Coords | null>(null);
+  const [placeLabel, setPlaceLabel] = useState('');
+  const [attachBusy, setAttachBusy] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
+
+  // 클립 → 사진 보내기: pick (PHPicker/photo picker, no album prompt) → upload → IMAGE message.
+  const sendPhoto = async () => {
+    setAttachSheet(false);
+    setPhotoDenied(false);
+    setAttachError(null);
+    const picked = await pickPhotos(1);
+    if (picked.status === 'denied') return setPhotoDenied(true);
+    if (picked.status === 'error') return setAttachError(picked.message);
+    if (picked.status !== 'picked') return;
+    setAttachBusy(true);
+    try {
+      const mediaId = await uploadCommunityPhoto(picked.photos[0]);
+      setAttachError(await sendAttachment({ kind: 'IMAGE', mediaId }));
+    } catch (err) {
+      setAttachError(writeErrorMessage(err));
+    } finally {
+      setAttachBusy(false);
+    }
+  };
+
+  // 위치 보내기: current fix first (LOCATION needs coordinates), then a label the other side reads.
+  const startLocation = async () => {
+    setAttachSheet(false);
+    setAttachError(null);
+    setAttachBusy(true);
+    try {
+      setPendingCoords(await getCurrentCoords());
+      setPlaceLabel('');
+    } catch (failure) {
+      if (failure === 'DENIED') setLocationDenied(true);
+      else setAttachError('현재 위치를 가져오지 못했어요.');
+    } finally {
+      setAttachBusy(false);
+    }
+  };
+
+  const sendLocation = async () => {
+    if (!pendingCoords) return;
+    const location = { label: placeLabel.trim() || '현재 위치', ...pendingCoords };
+    setPendingCoords(null);
+    setAttachBusy(true);
+    setAttachError(await sendAttachment({ kind: 'LOCATION', location }));
+    setAttachBusy(false);
+  };
 
   const messageCount = state.status === 'ready' ? state.messages.length + state.pending.length : 0;
   useEffect(() => {
@@ -113,10 +169,11 @@ export function InquiryRoomScreen() {
             }}
           />
 
+          {!!attachError && <Text style={styles.attachError}>{attachError}</Text>}
           {state.room.canSend ? (
             <View style={[styles.composer, { marginBottom: Math.max(insets.bottom, 12) }]}>
-              <Pressable onPress={() => Alert.alert('곧 지원돼요', '사진·위치 보내기는 곧 지원될 예정이에요.')} hitSlop={8}>
-                <Paperclip size={18} color="#b7a9c4" strokeWidth={1.7} />
+              <Pressable onPress={() => setAttachSheet(true)} disabled={attachBusy} hitSlop={8}>
+                {attachBusy ? <ActivityIndicator size="small" color="#b7a9c4" /> : <Paperclip size={18} color="#b7a9c4" strokeWidth={1.7} />}
               </Pressable>
               <TextInput
                 style={styles.input}
@@ -138,6 +195,37 @@ export function InquiryRoomScreen() {
           )}
         </>
       )}
+
+      <ActionSheet visible={attachSheet} onClose={() => setAttachSheet(false)}>
+        <SheetButton label="사진 보내기" onPress={sendPhoto} />
+        <SheetButton label="내 위치 보내기" onPress={startLocation} />
+        <SheetButton label="닫기" onPress={() => setAttachSheet(false)} />
+      </ActionSheet>
+
+      <ActionSheet visible={!!pendingCoords} onClose={() => setPendingCoords(null)} title="이 위치를 보낼까요?" message="지금 있는 곳의 위치가 지도 링크로 전달돼요.">
+        <TextInput style={styles.labelInput} value={placeLabel} onChangeText={setPlaceLabel} placeholder="장소 이름 (예: 후평동 편의점 앞)" placeholderTextColor="#baa6c0" maxLength={200} />
+        <SheetButton label="위치 보내기" tone="primary" onPress={sendLocation} />
+        <SheetButton label="취소" onPress={() => setPendingCoords(null)} />
+      </ActionSheet>
+
+      <PermissionSheet
+        visible={photoDenied}
+        title="사진 접근이 꺼져 있어요"
+        message="사진을 보내려면 설정에서 사진 접근을 허용해 주세요."
+        retryLabel="사진 다시 선택"
+        onRetry={sendPhoto}
+        alternativeLabel="대화로 돌아가기"
+        onAlternative={() => setPhotoDenied(false)}
+        onClose={() => setPhotoDenied(false)}
+      />
+      <PermissionSheet
+        visible={locationDenied}
+        title="위치 접근이 꺼져 있어요"
+        message="내 위치를 보내려면 설정에서 위치 접근을 허용해 주세요."
+        alternativeLabel="대화로 돌아가기"
+        onAlternative={() => setLocationDenied(false)}
+        onClose={() => setLocationDenied(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -298,6 +386,8 @@ function PendingBubble({ pending, onRetry }: { pending: PendingMessage; onRetry:
 }
 
 const styles = StyleSheet.create({
+  attachError: { fontFamily: fonts.body, fontSize: 11.5, color: '#c0526b', textAlign: 'center', marginBottom: 6 },
+  labelInput: { height: 48, paddingHorizontal: 16, backgroundColor: '#fffefa', borderWidth: 0.9, borderColor: '#e0d6e6', borderRadius: 13, fontFamily: fonts.body, fontSize: 13, color: '#6b6878' },
   root: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingBottom: 12 },
   back: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#f7fcfc', borderWidth: 0.8, borderColor: '#cce2e7', alignItems: 'center', justifyContent: 'center' },

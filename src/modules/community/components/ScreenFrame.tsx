@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
@@ -7,11 +7,11 @@ import { ChevronLeft } from 'lucide-react-native';
 import { fonts } from '../../../shared/lib/fonts';
 
 // Header (round back + title) + gradient + scrolling body shared by the community detail screens.
-export function ScreenFrame({ title, children, right }: { title: string; children: ReactNode; right?: ReactNode }) {
+export function ScreenFrame({ title, children, right, footer }: { title: string; children: ReactNode; right?: ReactNode; footer?: ReactNode }) {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   return (
-    <View style={styles.root}>
+    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Svg style={StyleSheet.absoluteFill}>
         <Defs>
           <LinearGradient id="frameBg" x1="0" y1="0" x2="0" y2="1">
@@ -29,8 +29,9 @@ export function ScreenFrame({ title, children, right }: { title: string; childre
         <Text style={styles.title}>{title}</Text>
         {right}
       </View>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]}>{children}</ScrollView>
-    </View>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingBottom: footer ? 20 : insets.bottom + 28 }]}>{children}</ScrollView>
+      {footer}
+    </KeyboardAvoidingView>
   );
 }
 

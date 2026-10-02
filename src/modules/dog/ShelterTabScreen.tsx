@@ -6,6 +6,7 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { fonts } from '../../shared/lib/fonts';
 import { getCurrentCoords, type Coords } from '../../shared/lib/deviceLocation';
 import { SvgIcon } from '../../shared/ui/SvgIcon';
+import { PermissionSheet } from '../../shared/ui/ActionSheet';
 import { ConnectionErrorView } from '../../shared/ui/ConnectionErrorView';
 import { svgAssets } from './assets/svgAssets';
 import { ShelterHouse } from './components/ShelterHouse';
@@ -30,6 +31,7 @@ export function ShelterTabScreen() {
   const [coords, setCoords] = useState<Coords | null>(null);
   const [locating, setLocating] = useState(false);
   const [regionSheetOpen, setRegionSheetOpen] = useState(false);
+  const [locationDenied, setLocationDenied] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [allRegions, setAllRegions] = useState<string[]>([]);
 
@@ -51,12 +53,11 @@ export function ShelterTabScreen() {
       setCoords(await getCurrentCoords());
       setRegion(null);
     } catch (failure) {
-      Alert.alert(
-        failure === 'DENIED' ? '위치 권한이 필요해요' : '위치를 가져오지 못했어요',
-        failure === 'DENIED'
-          ? '설정에서 위치 권한을 허용하면 가까운 보호소를 거리순으로 볼 수 있어요.'
-          : '잠시 후 다시 시도해 주세요.',
-      );
+      if (failure === 'DENIED') {
+        setLocationDenied(true); // Figma 21 시트
+      } else {
+        Alert.alert('위치를 가져오지 못했어요', '잠시 후 다시 시도해 주세요.');
+      }
     } finally {
       setLocating(false);
     }
@@ -170,6 +171,18 @@ export function ShelterTabScreen() {
           <SvgIcon xml={svgAssets.chevronConfirm} width={16} height={16} />
         </Pressable>
       )}
+
+      <PermissionSheet
+        visible={locationDenied}
+        title="위치 접근이 꺼져 있어요"
+        message={'설정에서 위치 접근을 허용하면 가까운 보호소를 거리순으로 볼 수 있어요.\n지금은 지역을 직접 골라도 돼요.'}
+        alternativeLabel="지역 직접 선택"
+        onAlternative={() => {
+          setLocationDenied(false);
+          setRegionSheetOpen(true);
+        }}
+        onClose={() => setLocationDenied(false)}
+      />
 
       <Modal visible={regionSheetOpen} transparent animationType="fade" onRequestClose={() => setRegionSheetOpen(false)}>
         <Pressable style={styles.sheetBackdrop} onPress={() => setRegionSheetOpen(false)}>

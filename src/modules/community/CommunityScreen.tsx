@@ -3,11 +3,12 @@ import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextIn
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { MapPin, Search, Users } from 'lucide-react-native';
+import { MapPin, Pencil, Search, Users } from 'lucide-react-native';
 import { fonts } from '../../shared/lib/fonts';
 import { ConnectionErrorView } from '../../shared/ui/ConnectionErrorView';
 import { SvgIcon } from '../../shared/ui/SvgIcon';
 import { svgAssets as dogSvgAssets } from '../dog/assets/svgAssets';
+import { useAuthSession } from '../../shared/lib/useAuthSession';
 import { useCommunityPosts } from './hooks/useCommunityPosts';
 import { useCommunityRegion } from './hooks/useCommunityRegion';
 import { PostCard } from './components/PostCard';
@@ -25,6 +26,7 @@ const FILTERS: { key: CommunityCategory | 'ALL'; label: string }[] = [
 export function CommunityScreen() {
   const navigation = useNavigation<HomeTabScreenNavigationProp>();
   const insets = useSafeAreaInsets();
+  const session = useAuthSession();
   const { state: regionState, setRegion } = useCommunityRegion();
   const regionLabel = regionState.status === 'ready' ? regionState.regionLabel : null;
   const [search, setSearch] = useState('');
@@ -157,6 +159,14 @@ export function CommunityScreen() {
         ListFooterComponent={state.status === 'ready' && state.loadingMore ? <ActivityIndicator style={styles.gap} /> : undefined}
       />
 
+      <Pressable
+        style={styles.write}
+        onPress={() => (session.status === 'signedIn' ? navigation.navigate('CommunityCompose', filter === 'ALL' ? undefined : { category: filter }) : navigation.navigate('LoginGuide'))}
+      >
+        <Pencil size={16} color="#89709b" strokeWidth={1.9} />
+        <Text style={styles.writeText}>글쓰기</Text>
+      </Pressable>
+
       <Modal visible={editingRegion} transparent animationType="fade" onRequestClose={() => setEditingRegion(false)}>
         <Pressable style={styles.backdrop} onPress={() => setEditingRegion(false)}>
           <Pressable style={styles.sheet} onPress={() => undefined}>
@@ -215,6 +225,8 @@ const styles = StyleSheet.create({
   emptyLine: { fontFamily: fonts.body, fontSize: 12, lineHeight: 17, color: '#a298a3', textAlign: 'center' },
   emptyButton: { width: 240, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fffdf8', borderWidth: 1, borderColor: '#ddd2e3', borderRadius: 10 },
   emptyButtonText: { fontFamily: fonts.pixel, fontSize: 10.5, color: '#98859e' },
+  write: { position: 'absolute', right: 24, bottom: 20, height: 46, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#e5d9f0', borderWidth: 1, borderColor: '#cdbbdb', borderRadius: 23, shadowColor: '#4a4659', shadowOpacity: 0.12, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } },
+  writeText: { fontFamily: fonts.pixel, fontSize: 12.5, color: '#89709b' },
   backdrop: { flex: 1, backgroundColor: 'rgba(56,64,69,0.35)', justifyContent: 'center', paddingHorizontal: 24 },
   sheet: { backgroundColor: '#fcfaf4', borderRadius: 21, padding: 20, gap: 12 },
   sheetTitle: { fontFamily: fonts.pixel, fontSize: 16, color: '#6b8a9e' },
