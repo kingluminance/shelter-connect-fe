@@ -5,6 +5,7 @@ import { Canvas, Image as SkiaImage, useImage } from '@shopify/react-native-skia
 import { useCommunityPreview } from '../../community/hooks/useCommunityPreview';
 import { fetchCommunityMediaUrl } from '../../community/api/posts';
 import { fonts } from '../../../shared/lib/fonts';
+import { formatRelativeTime } from '../../../shared/lib/relativeTime';
 import { HomeSvg } from './HomeSvg';
 import type { HomeTabScreenNavigationProp } from '../../../app/navigation';
 import type { CommunityCategory } from '../../community/types';
@@ -14,15 +15,6 @@ const CATEGORY_LABEL: Record<CommunityCategory, string> = {
   FOUND: '발견했어요',
   NEIGHBOR_NEWS: '동네 소식',
 };
-
-function relativeTime(iso: string): string {
-  const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
-  if (minutes < 1) return '방금 전';
-  if (minutes < 60) return `${minutes}분 전`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}시간 전`;
-  return `${Math.floor(hours / 24)}일 전`;
-}
 
 // Figma "Community / home preview" (node 22:15867) — a single newest post, photo via
 // a signed /community/media URL (community-api.md: signed URLs expire in 60s, so this
@@ -58,12 +50,12 @@ export function CommunityPreviewSection() {
       {state.status === 'error' && <Text style={styles.hintText}>소식을 못 불러왔어요</Text>}
       {state.status === 'ready' && !state.post && <Text style={styles.hintText}>아직 소식이 없어요</Text>}
       {state.status === 'ready' && state.post && (
-        <Pressable style={styles.card} onPress={goToCommunityTab}>
+        <Pressable style={styles.card} onPress={() => navigation.navigate('CommunityPost', { postId: state.post!.id })}>
           <PostThumbnail mediaId={state.post.content.mediaIds[0]} />
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{CATEGORY_LABEL[state.post.category]}</Text>
           </View>
-          <Text style={styles.timeText}>{relativeTime(state.post.publishedAt ?? state.post.createdAt)}</Text>
+          <Text style={styles.timeText}>{formatRelativeTime(state.post.publishedAt ?? state.post.createdAt)}</Text>
           <Text style={styles.title} numberOfLines={1}>
             {state.post.content.title}
           </Text>

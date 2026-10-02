@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Linking, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, MapPin, Paperclip, SendHorizontal, User } fr
 import { useMediaUrl } from '../community/hooks/useMediaUrl';
 import { formatClock, formatDayHeader, isSameDay } from '../../shared/lib/chatTime';
 import { fonts } from '../../shared/lib/fonts';
+import { openInMaps } from '../../shared/lib/mapLinks';
 import { ConnectionErrorView } from '../../shared/ui/ConnectionErrorView';
 import { RemoteImage } from '../../shared/ui/RemoteImage';
 import { useInquiryRoom, type PendingMessage } from './hooks/useInquiryRoom';
@@ -244,12 +245,7 @@ function MessageContent({ message }: { message: InquiryMessage }) {
 
   if (message.kind === 'LOCATION' && message.location) {
     const { label, latitude, longitude } = message.location;
-    const open = () =>
-      Linking.openURL(
-        Platform.OS === 'ios'
-          ? `http://maps.apple.com/?ll=${latitude},${longitude}&q=${encodeURIComponent(label)}`
-          : `geo:${latitude},${longitude}?q=${latitude},${longitude}(${encodeURIComponent(label)})`,
-      ).catch(() => undefined);
+    const open = () => openInMaps({ label, latitude, longitude }).catch(() => undefined);
     return (
       <Pressable onPress={open} style={styles.locationCard}>
         <View style={styles.locationRow}>

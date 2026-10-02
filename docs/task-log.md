@@ -26,6 +26,7 @@
 | F-17 | 보호소 탭(주변 보호소·기준 위치·검색·선택/변경) + 저장한 친구 탭(검색·필터·저장 해제) Figma 적용, 채팅 화면 저장 하트, `@react-native-community/geolocation` 추가 (`/v1/shelter-discovery`, `/v1/me/saved-dogs`, `/v1/me/preferences`) | - | 🔎 리뷰 대기 |
 | F-18 | 인증 + 내 정보·설정 Figma 적용 (로그인·회원가입(닉네임·약관 동의)·로그인 안내·내 정보/설정·로그인 만료·연결 오류, `/v1/registration-policy`·`/v1/me/profile`·`/v1/me/consents`) | - | 🔎 리뷰 대기 |
 | F-19 | 대화 탭(강아지 대화 + 이웃 문의) + 이웃 문의방 Figma 적용 (`/v1/me/dog-conversations`, `/v1/inquiry-rooms`), F-18 후속(로그인 만료·연결 오류 디자인 맞춤) | - | 🔎 리뷰 대기 |
+| F-20 | 커뮤니티 읽기 Figma 적용 (목록·검색·필터·내 동네, 상세, 댓글·제보, 위치 보기[주소 복사·지도 앱으로 보기]) — `/v1/community/posts`·`/comments`·`/media`·`/me/community-region` | - | 🔎 리뷰 대기 |
 
 > ⚠️ 이 표의 `F-XX`는 이 레포(프론트) 안에서만 순서대로 매긴 번호다. 노션의 작업 보드가 별도로 쓰는
 > `F-XX` 번호(예: 노션 F-06 = 사진/프로필, F-07 = 로그인)와 **우연히 겹치지만 다른 체계**다 — 팀 리뷰

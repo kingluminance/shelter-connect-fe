@@ -44,3 +44,20 @@ export interface CommunityPost {
   commentCount: number;
   sightingCount: number;
 }
+
+export type CommentKind = 'COMMENT' | 'SIGHTING';
+
+export interface CommunityComment {
+  id: string;
+  postId: string;
+  /** null once the comment was deleted (the row stays as a marker so replies keep their place). */
+  authorId: string | null;
+  authorName: string | null;
+  mine: boolean;
+  kind: CommentKind;
+  /** Set on a reply — one level deep; sightings never have a parent. */
+  parentId: string | null;
+  content: { text: string; location: CommunityPostLocation | null; mediaIds: string[] } | null;
+  deleted: boolean;
+  createdAt: string;
+}

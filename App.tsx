@@ -17,6 +17,9 @@ import { LoginScreen } from './src/modules/auth/LoginScreen';
 import { SignUpScreen } from './src/modules/auth/SignUpScreen';
 import { LoginGuideScreen } from './src/modules/auth/LoginGuideScreen';
 import { InquiryRoomScreen } from './src/modules/inquiry/InquiryRoomScreen';
+import { CommunityPostScreen } from './src/modules/community/CommunityPostScreen';
+import { CommunityCommentsScreen } from './src/modules/community/CommunityCommentsScreen';
+import { CommunityLocationsScreen } from './src/modules/community/CommunityLocationsScreen';
 import { onAuthExpired } from './src/shared/lib/authExpired';
 import type { RootStackParamList } from './src/app/navigation';
 
@@ -54,6 +57,9 @@ function App() {
               options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade' }}
             />
             <Stack.Screen name="InquiryRoom" component={InquiryRoomScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="CommunityPost" component={CommunityPostScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="CommunityComments" component={CommunityCommentsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="CommunityLocations" component={CommunityLocationsScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: '소개서' }} />
           </Stack.Navigator>
         </NavigationContainer>
