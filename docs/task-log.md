@@ -19,6 +19,7 @@
 | F-11 | 채팅 화면을 프로토타입 HTML(pet-chat-section.html)과 픽셀 단위로 맞춤 (lucide 아이콘, real-v1 정원 배경 에셋, 반응형 compact 브레이크포인트) | [#10](https://github.com/kingluminance/shelter-connect-fe/pull/10) | ✅ |
 | F-12 | 매니페스트 기반 강아지 행동 재생 엔진 (`/v1/dogs/{dogId}/assets` 대응, SIT/LIE_DOWN 역재생, DogSprite 컴포넌트) — Phase 1, 로컬 real-v1 번들로 실기 검증 완료. 네트워크 연동(Phase 2)·공놀이 리워크(Phase 3)는 후속 | [#11](https://github.com/kingluminance/shelter-connect-fe/pull/11) | ✅ |
 | F-13 | 플레이테스트 피드백 반영 (강아지 충돌 박스, 말 걸기 버튼 크기, 채팅 화면 safe-area, 게임 카메라/캐릭터 크기, 강아지 상태 라벨) + 맵 이동용 방향별(앞/뒤/좌/우) 스프라이트 지원 (`real-map-v1` 에셋, `mapDirections`, `movementFacing`/`selectDirectionalClip`) | [#14](https://github.com/kingluminance/shelter-connect-fe/pull/14) | ✅ |
+| F-13 | 로그인 토큰을 Keychain/Keystore에 저장하고 기존 평문 세션 이전 (노션 작업 보드 F-13, 위 플레이테스트 F-13과 별개) | [#12](https://github.com/kingluminance/shelter-connect-fe/pull/12) | 🔎 리뷰 대기 |
 | F-14 | Android 배포 서명을 개발용 공개 키와 분리하고 잘못된 배포 차단 | [#13](https://github.com/kingluminance/shelter-connect-fe/pull/13) | 🔎 리뷰 대기 |
 | F-15 | Figma 리디자인 — 5탭 바텀 네비게이션 셸 + 홈 화면(보호소 입장 카드/마음에 담은 친구/동네 커뮤니티 미리보기), 실제 API 연동(`/v1/me/preferences`, `/v1/me/saved-dogs`, `/community/posts`) | [#15](https://github.com/kingluminance/shelter-connect-fe/pull/15) | ✅ |
 

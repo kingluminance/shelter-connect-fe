@@ -45,6 +45,14 @@
 네이비 잉크 `#172b56`, 노랑 포인트 `#ffdc79`, 파랑 primary 버튼 `#4f85f4` + 3px 오프셋 그림자) 그대로.
 `SUPABASE_ANON_KEY`가 비어 있으면(`supabase`가 `null`) 폼 대신 "설정 중" 안내만 보여줌 — 크래시 아님.
 
+## 토큰 보관
+
+Supabase SDK의 저장 어댑터는 `secureAuthStorage.ts`다. iOS Keychain과 Android Keystore를 사용하며, 새 토큰을 AsyncStorage에 쓰지 않는다. iOS에서는 최초 잠금 해제 후 자동 갱신이 가능하고 다른 기기로 복원되지 않는 접근 등급을 쓴다.
+
+기존 사용자의 세션은 처음 읽을 때 암호화 저장을 완료한 뒤 AsyncStorage에서 지운다. 로그아웃은 SDK의 `supabase.auth.signOut()`으로 처리한다. 어댑터는 토큰 대신 빈 기록을 남겨, 중간에 앱이 종료되어도 이전 평문 토큰이 복구되지 않게 한다. 보안 저장소가 잠겼거나 저장에 실패하면 평문 저장으로 되돌아가지 않고 오류를 반환한다.
+
+네이티브 의존성이 추가됐으므로 `npm ci`, iOS `pod install`, 앱 재빌드가 필요하다. Metro 새로고침만으로는 적용되지 않는다. 로그인 → 앱 재시작 → 토큰 갱신 → 로그아웃 → 재시작 순서로 두 플랫폼에서 확인한다. iOS Keychain은 앱 삭제 후에도 남을 수 있으므로 계정 변경/테스트 초기화는 로그아웃으로 한다.
+
 ## (확인 필요)
 - Supabase 프로젝트의 `SUPABASE_ANON_KEY` (URL은 확인됨: `https://gwimdiwrqfcqulefshoz.supabase.co`,
   `.env.example` 참고) — 백엔드팀에게 요청. 이게 없으면 로그인 화면이 폼 대신 안내 문구만 보여줌
