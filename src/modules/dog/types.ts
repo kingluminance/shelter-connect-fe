@@ -139,6 +139,20 @@ export interface UserPreferences {
   currentShelterId: string | null;
 }
 
+export interface DogConversation {
+  sessionId: string;
+  dogId: string;
+  dogName: string;
+  shelterName: string;
+  avatarKey: string;
+  /** false once the dog's public listing was withdrawn — only the user's own history remains. */
+  available: boolean;
+  saved: boolean;
+  lastMessage: string | null;
+  lastMessageRole: 'USER' | 'ASSISTANT' | null;
+  updatedAt: string;
+}
+
 export interface SavedDog {
   dogId: string;
   dogName: string;
