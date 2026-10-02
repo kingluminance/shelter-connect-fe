@@ -8,6 +8,8 @@ export type MainTabParamList = {
   커뮤니티: undefined;
   '저장한 친구': undefined;
   대화: undefined;
+  // 하단 탭 바에는 안 보이는 라우트 — Figma 18이 5탭 바를 그대로 보여주는 화면이라 탭 안에 둔다.
+  '내 정보': undefined;
 };
 
 export type RootStackParamList = {
@@ -15,6 +17,9 @@ export type RootStackParamList = {
   Game: { shelterId: string; shelterName: string };
   Chat: { dogId: string; dogName: string; identityIndex: number; shelterName: string };
   Login: undefined;
+  SignUp: undefined;
+  // Figma 17(로그인 안내)·19(로그인 만료) — 같은 시트, 문구만 다름.
+  LoginGuide: { reason?: 'expired' } | undefined;
   Profile: {
     dogId: string;
     dogName: string;

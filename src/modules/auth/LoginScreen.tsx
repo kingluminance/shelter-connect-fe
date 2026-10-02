@@ -1,36 +1,30 @@
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Canvas, FilterMode, Image as SkiaImage, useImage } from '@shopify/react-native-skia';
+import { ChevronRight, Lock, Mail } from 'lucide-react-native';
 import { supabase } from '../../shared/lib/supabase';
 import { ApiError } from '../../shared/lib/apiClient';
+import { fonts } from '../../shared/lib/fonts';
+import { SvgIcon } from '../../shared/ui/SvgIcon';
+import { authImages } from './assets/images';
+import { svgAssets } from './assets/svgAssets';
+import { AuthField } from './components/AuthField';
+import { AuthHeader } from './components/AuthHeader';
+import { AuthPrimaryButton } from './components/AuthButtons';
+import { AuthScreenFrame } from './components/AuthScreenFrame';
 import { registerServiceUser } from './api/account';
+import { applyPendingSignup } from './signupFlow';
+import { authErrorMessage } from './signupRules';
+import { leaveAuthFlow } from './leaveAuthFlow';
+import type { RootStackParamList } from '../../app/navigation';
 
-// Same app-shell language as ChatScreen's "PUPPY CONNECT" device and the
-// shelter-connect prototype's home screen (cream paper + yellow hero + navy ink +
-// blue primary button with an offset shadow) — kept here as plain constants since
-// there's no shared theme file yet.
-const INK = '#172b56';
-const PAPER = '#fff9e9';
-const YELLOW = '#ffdc79';
-const BLUE = '#4f85f4';
-const MUTED = '#58647f';
-const LINE = '#c2cbe1';
+const NEAREST = { filter: FilterMode.Nearest };
 
-type Mode = 'signIn' | 'signUp';
-
+// Figma "15 로그인" (43:25905).
 export function LoginScreen() {
-  const navigation = useNavigation();
-  const [mode, setMode] = useState<Mode>('signIn');
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -39,13 +33,10 @@ export function LoginScreen() {
 
   if (!supabase) {
     return (
-      <View style={[styles.container, styles.center]}>
-        <Text style={styles.kicker}>A LITTLE CLOSER, TOGETHER</Text>
-        <Text style={styles.title}>보호소 커넥트</Text>
-        <Text style={styles.notice}>
-          로그인 기능은 아직 설정 중이에요.{'\n'}(SUPABASE_ANON_KEY 미설정 — 백엔드팀 확인 필요)
-        </Text>
-      </View>
+      <AuthScreenFrame>
+        <AuthHeader title="로그인" />
+        <Text style={styles.notice}>로그인 기능은 아직 설정 중이에요.{'\n'}(SUPABASE_ANON_KEY 미설정 — 백엔드팀 확인 필요)</Text>
+      </AuthScreenFrame>
     );
   }
 
@@ -53,203 +44,172 @@ export function LoginScreen() {
     if (!supabase || busy) {
       return;
     }
+    if (!email.trim() || !password) {
+      setError('이메일과 비밀번호를 입력해 주세요.');
+      return;
+    }
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
-      if (mode === 'signIn') {
-        const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-        if (authError) {
-          throw authError;
-        }
-      } else {
-        const { data, error: authError } = await supabase.auth.signUp({ email, password });
-        if (authError) {
-          throw authError;
-        }
-        if (!data.session) {
-          setNotice('가입 확인 이메일을 보냈어요. 확인 후 로그인해 주세요.');
-          setBusy(false);
-          return;
-        }
+      const { error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (authError) {
+        throw authError;
       }
-      // "앱에서 연결할 순서" (auth-and-permissions.md): 로그인 직후 서비스 사용자 등록.
-      await registerServiceUser();
-      navigation.goBack();
+      // "앱에서 연결할 순서" (auth-and-permissions.md): 로그인 직후 서비스 사용자 등록. 이메일 확인을
+      // 거쳐 가입한 사용자의 보관해 둔 닉네임·동의는 여기서 처음 서버에 보낸다.
+      if (!(await applyPendingSignup(email))) {
+        await registerServiceUser();
+      }
+      leaveAuthFlow(navigation);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : String(err));
+      const message = err instanceof ApiError ? err.message : err instanceof Error ? err.message : String(err);
+      setError(authErrorMessage(message));
     } finally {
       setBusy(false);
     }
   }
 
+  async function sendPasswordReset() {
+    if (!supabase) {
+      return;
+    }
+    if (!email.trim()) {
+      setError('비밀번호를 재설정할 이메일을 먼저 입력해 주세요.');
+      setNotice(null);
+      return;
+    }
+    setError(null);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim());
+    if (resetError) {
+      setError(authErrorMessage(resetError.message));
+      return;
+    }
+    setNotice('비밀번호 재설정 메일을 보냈어요. 받은 편지함을 확인해 주세요.');
+  }
+
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <View style={styles.kickerTag}>
-          <Text style={styles.kicker}>A LITTLE CLOSER, TOGETHER</Text>
-        </View>
-        <Text style={styles.title}>{mode === 'signIn' ? '로그인' : '회원가입'}</Text>
-        <Text style={styles.subtitle}>강아지와 대화하려면 로그인이 필요해요.</Text>
+    <AuthScreenFrame>
+      <AuthHeader title="로그인" />
+      <LoginScene />
 
-        <View style={styles.card}>
-          <Text style={styles.label}>이메일</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@example.com"
-            placeholderTextColor={MUTED}
-            autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-            editable={!busy}
-          />
-          <Text style={styles.label}>비밀번호</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="********"
-            placeholderTextColor={MUTED}
-            secureTextEntry
-            autoCapitalize="none"
-            editable={!busy}
-          />
+      <Text style={styles.heading}>친구와 이야기를 이어가요</Text>
+      <Text style={styles.subheading}>강아지와 대화하고, 이웃들과 소식을 나눠요.</Text>
 
-          {error && <Text style={styles.errorText}>{error}</Text>}
-          {notice && <Text style={styles.noticeText}>{notice}</Text>}
+      <View style={styles.fields}>
+        <AuthField
+          label="이메일"
+          Icon={Mail}
+          value={email}
+          onChangeText={setEmail}
+          placeholder="이메일 주소를 입력해 주세요"
+          keyboardType="email-address"
+          autoComplete="email"
+          editable={!busy}
+        />
+        <AuthField
+          label="비밀번호"
+          Icon={Lock}
+          secure
+          value={password}
+          onChangeText={setPassword}
+          placeholder="비밀번호를 입력해 주세요"
+          autoComplete="current-password"
+          editable={!busy}
+          onSubmitEditing={submit}
+        />
+      </View>
 
-          <Pressable style={styles.primaryButton} onPress={submit} disabled={busy}>
-            {busy ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.primaryButtonText}>{mode === 'signIn' ? '로그인' : '회원가입'}</Text>
-            )}
-          </Pressable>
-        </View>
+      <Pressable style={styles.forgot} onPress={sendPasswordReset} hitSlop={8}>
+        <Text style={styles.forgotText}>비밀번호를 잊으셨나요?</Text>
+      </Pressable>
 
-        <Pressable
-          onPress={() => {
-            setMode(m => (m === 'signIn' ? 'signUp' : 'signIn'));
-            setError(null);
-            setNotice(null);
-          }}
-        >
-          <Text style={styles.switchText}>
-            {mode === 'signIn' ? '계정이 없으신가요? 회원가입' : '이미 계정이 있으신가요? 로그인'}
-          </Text>
+      {error && <Text style={styles.errorText}>{error}</Text>}
+      {notice && <Text style={styles.noticeText}>{notice}</Text>}
+
+      <View style={styles.submit}>
+        <AuthPrimaryButton label="로그인" onPress={submit} busy={busy} />
+      </View>
+
+      <View style={styles.switchRow}>
+        <Text style={styles.switchHint}>아직 계정이 없나요?</Text>
+        <Pressable onPress={() => navigation.navigate('SignUp')} hitSlop={8}>
+          <Text style={styles.switchLink}>회원가입</Text>
         </Pressable>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </View>
+
+      <View style={styles.divider} />
+      <Text style={styles.browseHint}>보호소와 강아지 정보는 로그인 없이 볼 수 있어요.</Text>
+      <Pressable style={styles.browse} onPress={() => navigation.goBack()} hitSlop={8}>
+        <Text style={styles.browseText}>먼저 둘러볼게요</Text>
+        <ChevronRight size={12} color="#91a17f" strokeWidth={2} />
+      </Pressable>
+    </AuthScreenFrame>
+  );
+}
+
+// Figma hero: mint blob + grass, a speech bubble, and the two dot dogs (sample art from the design).
+function LoginScene() {
+  const dubu = useImage(authImages.dubu);
+  const bori = useImage(authImages.bori);
+  return (
+    <View style={styles.scene}>
+      <View style={styles.blob} />
+      <View style={styles.grass} />
+      <View style={[styles.cloud, styles.cloudA]} />
+      <View style={[styles.cloud, styles.cloudAHigh]} />
+      <View style={[styles.cloud, styles.cloudB]} />
+      <View style={[styles.cloud, styles.cloudBHigh]} />
+      <View style={styles.shadowA} />
+      <View style={styles.shadowB} />
+      <Canvas style={styles.dubu}>
+        {dubu && <SkiaImage image={dubu} x={0} y={0} width={69.3} height={93} fit="contain" sampling={NEAREST} />}
+      </Canvas>
+      <Canvas style={styles.bori}>
+        {bori && <SkiaImage image={bori} x={0} y={0} width={60.8} height={67} fit="contain" sampling={NEAREST} />}
+      </Canvas>
+      <View style={styles.bubble}>
+        <Text style={styles.bubbleText}>다시 만나서 반가워!</Text>
+      </View>
+      <SvgIcon xml={svgAssets.sparkle8} width={8} height={8} style={styles.sparkleA} />
+      <SvgIcon xml={svgAssets.sparkle10} width={10} height={10} style={styles.sparkleB} />
+      <SvgIcon xml={svgAssets.heartSmall} width={10} height={9} style={styles.heart} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: PAPER,
-  },
-  center: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    gap: 8,
-  },
-  scrollContent: {
-    padding: 22,
-    paddingTop: 48,
-  },
-  kickerTag: {
-    alignSelf: 'flex-start',
-    backgroundColor: YELLOW,
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginBottom: 12,
-  },
-  kicker: {
-    fontSize: 11,
-    letterSpacing: 1.5,
-    color: INK,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: INK,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: MUTED,
-    marginTop: 8,
-    marginBottom: 24,
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: INK,
-    borderRadius: 12,
-    padding: 18,
-    gap: 4,
-  },
-  label: {
-    fontSize: 12,
-    color: MUTED,
-    marginTop: 12,
-    marginBottom: 6,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: LINE,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: INK,
-    backgroundColor: '#fff',
-  },
-  primaryButton: {
-    marginTop: 20,
-    backgroundColor: BLUE,
-    borderWidth: 2,
-    borderColor: INK,
-    borderRadius: 8,
-    paddingVertical: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    // Offset "pop" shadow, matching the prototype's .pm-primary button.
-    shadowColor: INK,
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 3,
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  switchText: {
-    textAlign: 'center',
-    color: BLUE,
-    fontSize: 13,
-    marginTop: 20,
-    textDecorationLine: 'underline',
-  },
-  errorText: {
-    color: '#b3364f',
-    fontSize: 12,
-    marginTop: 12,
-  },
-  noticeText: {
-    color: MUTED,
-    fontSize: 12,
-    marginTop: 12,
-  },
-  notice: {
-    fontSize: 13,
-    color: MUTED,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+  notice: { fontFamily: fonts.body, fontSize: 13, color: '#8c7b99', textAlign: 'center', marginTop: 48 },
+  scene: { alignSelf: 'center', width: 260, height: 160, marginTop: 38 },
+  blob: { position: 'absolute', top: 0, width: 228, height: 149, borderRadius: 70, backgroundColor: '#e9f3ee', left: 16 },
+  grass: { position: 'absolute', left: 29, top: 97, width: 202, height: 44, borderRadius: 22, backgroundColor: '#e1eacf' },
+  cloud: { position: 'absolute', backgroundColor: '#fffcf0' },
+  cloudA: { left: 39, top: 33, width: 24, height: 6 },
+  cloudAHigh: { left: 47, top: 29, width: 10, height: 4 },
+  cloudB: { left: 204, top: 51, width: 18, height: 5 },
+  cloudBHigh: { left: 209, top: 47, width: 7, height: 4 },
+  shadowA: { position: 'absolute', left: 59, top: 125, width: 76, height: 8, borderRadius: 4, backgroundColor: '#cbd8b8' },
+  shadowB: { position: 'absolute', left: 150, top: 124, width: 57, height: 7, borderRadius: 4, backgroundColor: '#cbd8b8' },
+  dubu: { position: 'absolute', left: 64, top: 39, width: 70, height: 93 },
+  bori: { position: 'absolute', left: 151, top: 60, width: 61, height: 67 },
+  bubble: { position: 'absolute', left: 83, top: -5, width: 107, height: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fffef6', borderWidth: 0.8, borderColor: '#d9d6cb', borderRadius: 10 },
+  bubbleText: { fontFamily: fonts.pixel, fontSize: 9, lineHeight: 13, color: '#9a9590' },
+  sparkleA: { position: 'absolute', left: 7, top: 80 },
+  sparkleB: { position: 'absolute', left: 241, top: 17 },
+  heart: { position: 'absolute', left: 226, top: 108 },
+  heading: { fontFamily: fonts.pixel, fontSize: 23, lineHeight: 32, color: '#657383', textAlign: 'center', marginTop: 18 },
+  subheading: { fontFamily: fonts.body, fontSize: 12, lineHeight: 17, color: '#9b9ca5', textAlign: 'center', marginTop: 9 },
+  fields: { gap: 22, marginTop: 38 },
+  forgot: { alignSelf: 'flex-end', marginTop: 16 },
+  forgotText: { fontFamily: fonts.body, fontSize: 11, lineHeight: 15, color: '#a38aaf' },
+  errorText: { fontFamily: fonts.body, fontSize: 12, color: '#c0526b', marginTop: 12 },
+  noticeText: { fontFamily: fonts.body, fontSize: 12, color: '#6f8f5f', marginTop: 12 },
+  submit: { marginTop: 24 },
+  switchRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 28, marginTop: 28 },
+  switchHint: { fontFamily: fonts.body, fontSize: 12, lineHeight: 17, color: '#ac9bb4' },
+  switchLink: { fontFamily: fonts.pixel, fontSize: 12, lineHeight: 17, color: '#9278a6', textDecorationLine: 'underline' },
+  divider: { height: 0.7, backgroundColor: '#e8e1d7', marginTop: 28 },
+  browseHint: { fontFamily: fonts.body, fontSize: 10.5, lineHeight: 15, color: '#a9a8a0', textAlign: 'center', marginTop: 24 },
+  browse: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 22 },
+  browseText: { fontFamily: fonts.pixel, fontSize: 13, lineHeight: 18, color: '#91a17f' },
 });

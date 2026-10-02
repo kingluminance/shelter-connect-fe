@@ -9,6 +9,7 @@ import { SpriteFrame } from '../game/core/entities/SpriteFrame';
 import { DOG_FRAME_SIZE, dogIdleRow, dogWalkAtlas } from '../game/core/assets/dog/dogWalkAtlas';
 import { fonts } from '../../shared/lib/fonts';
 import { SvgIcon } from '../../shared/ui/SvgIcon';
+import { ConnectionErrorView } from '../../shared/ui/ConnectionErrorView';
 import { svgAssets } from './assets/svgAssets';
 import { fetchDog } from './api/shelters';
 import { unsaveDog } from './api/savedDogs';
@@ -105,14 +106,18 @@ export function SavedFriendsScreen() {
         </View>
 
         {state.status === 'loading' && <ActivityIndicator style={styles.gap} />}
-        {state.status === 'error' && <Text style={[styles.hintText, styles.gap]}>친구 목록을 못 불러왔어요: {state.message}</Text>}
+        {state.status === 'error' && (
+          <View style={styles.gap}>
+            <ConnectionErrorView message={state.message} onRetry={reload} />
+          </View>
+        )}
 
         {state.status === 'anon' && (
           <EmptyState
             title="로그인이 필요해요"
             lines={['로그인하면 마음에 담은 친구를', '여기서 다시 만날 수 있어요.']}
             action="로그인하기"
-            onAction={() => navigation.navigate('Login')}
+            onAction={() => navigation.navigate('LoginGuide')}
           />
         )}
         {state.status === 'ready' && dogs.length === 0 && (

@@ -169,7 +169,7 @@ export function ChatScreen() {
                 <>
                   <Text style={styles.errorText}>대화를 시작하지 못했어요: {state.message}</Text>
                   {(state.code === 'UNAUTHENTICATED' || state.code === 'ACCOUNT_NOT_REGISTERED') && (
-                    <Pressable onPress={() => navigation.navigate('Login')}>
+                    <Pressable onPress={() => navigation.navigate('LoginGuide')}>
                       <Text style={styles.loginCta}>로그인하기</Text>
                     </Pressable>
                   )}
@@ -192,7 +192,7 @@ export function ChatScreen() {
               <Pressable
                 style={styles.saveButton}
                 hitSlop={10}
-                onPress={() => (dogSaved.needsLogin ? navigation.navigate('Login') : dogSaved.toggle())}
+                onPress={() => (dogSaved.needsLogin ? navigation.navigate('LoginGuide') : dogSaved.toggle())}
               >
                 <Text style={styles.dialogueHeart}>{dogSaved.saved ? '♥' : '♡'}</Text>
               </Pressable>
