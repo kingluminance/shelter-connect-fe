@@ -14,14 +14,16 @@ export interface DiscoveryQuery {
 }
 
 /** Nearby-shelter list for the 보호소 tab. Refetches when the search/region/location changes. */
-export function useShelterDiscovery(query: DiscoveryQuery): ShelterDiscoveryState {
+export function useShelterDiscovery(query: DiscoveryQuery) {
   const [state, setState] = useState<ShelterDiscoveryState>({ status: 'loading' });
+  const [version, setVersion] = useState(0);
   const { q, region, coords } = query;
   const latitude = coords?.latitude;
   const longitude = coords?.longitude;
 
   useEffect(() => {
     let cancelled = false;
+    setState(prev => (prev.status === 'error' ? { status: 'loading' } : prev));
     // 입력 중 매 글자마다 요청하지 않도록 잠깐 기다린다.
     const timer = setTimeout(async () => {
       try {
@@ -45,7 +47,7 @@ export function useShelterDiscovery(query: DiscoveryQuery): ShelterDiscoveryStat
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [q, region, latitude, longitude]);
+  }, [q, region, latitude, longitude, version]);
 
-  return state;
+  return { state, reload: () => setVersion(v => v + 1) };
 }

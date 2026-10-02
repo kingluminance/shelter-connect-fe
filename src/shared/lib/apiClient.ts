@@ -1,5 +1,6 @@
 import { API_BASE_URL } from '@env';
 import { supabase } from './supabase';
+import { notifyAuthExpired } from './authExpired';
 
 // 보호소 커넥트 백엔드(Spring Boot) 계약: docs/api-conventions.md 참고
 export class ApiError extends Error {
@@ -23,14 +24,25 @@ export async function apiFetch<T>(
   // still work.
   const token = supabase ? (await supabase.auth.getSession()).data.session?.access_token : undefined;
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+    });
+  } catch {
+    // fetch only rejects when no response arrived at all (offline, DNS, timeout) — screens
+    // show the 연결 오류 view for this code and offer a retry.
+    throw new ApiError('NETWORK_ERROR', '인터넷 연결을 확인해 주세요.', '');
+  }
+
+  if (response.status === 401 && token) {
+    notifyAuthExpired();
+  }
 
   if (!response.ok) {
     const body = await response.json().catch(() => null);

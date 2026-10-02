@@ -1,10 +1,9 @@
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useAuthSession } from '../../shared/lib/useAuthSession';
 import { fonts } from '../../shared/lib/fonts';
-import { supabase } from '../../shared/lib/supabase';
 import { HomeSvg } from './components/HomeSvg';
 import { ShelterEntranceCard } from './components/ShelterEntranceCard';
 import { SavedFriendsSection } from './components/SavedFriendsSection';
@@ -20,17 +19,8 @@ export function HomeScreen() {
   const insets = useSafeAreaInsets();
   const session = useAuthSession();
 
-  // 내 정보·설정 화면이 아직 없어서: 로그아웃 상태 → 로그인, 로그인 상태 → 로그아웃 확인.
-  const onProfilePress = () => {
-    if (session.status !== 'signedIn') {
-      navigation.navigate('Login');
-      return;
-    }
-    Alert.alert('로그아웃', '로그아웃할까요?', [
-      { text: '취소', style: 'cancel' },
-      { text: '로그아웃', style: 'destructive', onPress: () => supabase?.auth.signOut() },
-    ]);
-  };
+  // 로그인 상태 → 내 정보·설정(Figma 18), 로그아웃 상태 → 로그인 안내(Figma 17).
+  const onProfilePress = () => navigation.navigate(session.status === 'signedIn' ? '내 정보' : 'LoginGuide');
 
   return (
     <View style={styles.root}>

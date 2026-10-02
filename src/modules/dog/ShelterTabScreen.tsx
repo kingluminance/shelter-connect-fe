@@ -6,6 +6,7 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { fonts } from '../../shared/lib/fonts';
 import { getCurrentCoords, type Coords } from '../../shared/lib/deviceLocation';
 import { SvgIcon } from '../../shared/ui/SvgIcon';
+import { ConnectionErrorView } from '../../shared/ui/ConnectionErrorView';
 import { svgAssets } from './assets/svgAssets';
 import { ShelterHouse } from './components/ShelterHouse';
 import { useCurrentShelter } from './hooks/useCurrentShelter';
@@ -32,7 +33,7 @@ export function ShelterTabScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [allRegions, setAllRegions] = useState<string[]>([]);
 
-  const state = useShelterDiscovery({ q: search, region, coords });
+  const { state, reload } = useShelterDiscovery({ q: search, region, coords });
 
   useEffect(() => {
     if (state.status === 'ready' && !search && !region) {
@@ -129,7 +130,11 @@ export function ShelterTabScreen() {
         </View>
 
         {state.status === 'loading' && <ActivityIndicator style={styles.statusGap} />}
-        {state.status === 'error' && <Text style={[styles.hintText, styles.statusGap]}>보호소를 못 불러왔어요: {state.message}</Text>}
+        {state.status === 'error' && (
+          <View style={styles.statusGap}>
+            <ConnectionErrorView message={state.message} onRetry={reload} />
+          </View>
+        )}
         {state.status === 'ready' && shelters.length === 0 && (
           <Text style={[styles.hintText, styles.statusGap]}>조건에 맞는 보호소가 없어요</Text>
         )}

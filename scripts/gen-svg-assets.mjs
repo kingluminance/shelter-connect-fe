@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 // react-native-svg's SvgXml — avoids a metro svg-transformer dependency.
 // Add a module's assets dir to `targets` to generate its svgAssets.ts.
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const targets = ['../src/modules/home/assets', '../src/modules/dog/assets'];
+const targets = ['../src/modules/home/assets', '../src/modules/dog/assets', '../src/modules/auth/assets'];
 
 const camel = (name) => name.replace(/-([a-z0-9])/g, (_, c) => c.toUpperCase());
 
