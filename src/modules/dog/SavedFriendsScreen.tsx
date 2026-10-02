@@ -108,7 +108,7 @@ export function SavedFriendsScreen() {
         {state.status === 'loading' && <ActivityIndicator style={styles.gap} />}
         {state.status === 'error' && (
           <View style={styles.gap}>
-            <ConnectionErrorView message={state.message} onRetry={reload} />
+            <ConnectionErrorView message="친구 목록을 불러오지 못했어요." onRetry={reload} />
           </View>
         )}
 

@@ -132,7 +132,7 @@ export function ShelterTabScreen() {
         {state.status === 'loading' && <ActivityIndicator style={styles.statusGap} />}
         {state.status === 'error' && (
           <View style={styles.statusGap}>
-            <ConnectionErrorView message={state.message} onRetry={reload} />
+            <ConnectionErrorView message="보호소 목록을 불러오지 못했어요." onRetry={reload} />
           </View>
         )}
         {state.status === 'ready' && shelters.length === 0 && (

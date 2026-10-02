@@ -6,20 +6,20 @@ jest.mock('./supabase', () => ({
 }));
 jest.mock('./authExpired', () => ({ notifyAuthExpired: jest.fn() }));
 
-const originalFetch = global.fetch;
+const originalFetch = globalThis.fetch;
 afterEach(() => {
-  global.fetch = originalFetch;
+  globalThis.fetch = originalFetch;
   jest.clearAllMocks();
 });
 
 test('a fetch that never gets a response becomes NETWORK_ERROR', async () => {
-  global.fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed'));
+  globalThis.fetch = jest.fn().mockRejectedValue(new TypeError('Network request failed'));
   await expect(apiFetch('/v1/shelters')).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
   await expect(apiFetch('/v1/shelters')).rejects.toBeInstanceOf(ApiError);
 });
 
 test('401 on a request that carried a token announces the expiry', async () => {
-  global.fetch = jest.fn().mockResolvedValue({
+  globalThis.fetch = jest.fn().mockResolvedValue({
     ok: false,
     status: 401,
     statusText: 'Unauthorized',
@@ -30,7 +30,7 @@ test('401 on a request that carried a token announces the expiry', async () => {
 });
 
 test('other errors keep their server code and do not announce expiry', async () => {
-  global.fetch = jest.fn().mockResolvedValue({
+  globalThis.fetch = jest.fn().mockResolvedValue({
     ok: false,
     status: 500,
     statusText: 'Server Error',
