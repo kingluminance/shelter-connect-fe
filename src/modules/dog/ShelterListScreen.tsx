@@ -1,5 +1,6 @@
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useShelters } from './hooks/useShelters';
 import { useCurrentShelter } from './hooks/useCurrentShelter';
 import type { Shelter } from './types';
@@ -12,6 +13,7 @@ export function ShelterListScreen() {
   const navigation = useNavigation<HomeTabScreenNavigationProp>();
   const state = useShelters();
   const { setCurrentShelter } = useCurrentShelter();
+  const insets = useSafeAreaInsets();
 
   if (state.status === 'loading') {
     return (
@@ -31,7 +33,7 @@ export function ShelterListScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <Pressable style={styles.loginLink} onPress={() => navigation.navigate('Login')}>
         <Text style={styles.loginLinkText}>로그인</Text>
       </Pressable>

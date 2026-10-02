@@ -1,9 +1,10 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { useAuthSession } from '../../shared/lib/useAuthSession';
 import { fonts } from '../../shared/lib/fonts';
+import { supabase } from '../../shared/lib/supabase';
 import { HomeSvg } from './components/HomeSvg';
 import { ShelterEntranceCard } from './components/ShelterEntranceCard';
 import { SavedFriendsSection } from './components/SavedFriendsSection';
@@ -18,6 +19,18 @@ export function HomeScreen() {
   const navigation = useNavigation<HomeTabScreenNavigationProp>();
   const insets = useSafeAreaInsets();
   const session = useAuthSession();
+
+  // 내 정보·설정 화면이 아직 없어서: 로그아웃 상태 → 로그인, 로그인 상태 → 로그아웃 확인.
+  const onProfilePress = () => {
+    if (session.status !== 'signedIn') {
+      navigation.navigate('Login');
+      return;
+    }
+    Alert.alert('로그아웃', '로그아웃할까요?', [
+      { text: '취소', style: 'cancel' },
+      { text: '로그아웃', style: 'destructive', onPress: () => supabase?.auth.signOut() },
+    ]);
+  };
 
   return (
     <View style={styles.root}>
@@ -36,7 +49,7 @@ export function HomeScreen() {
         <View style={styles.header}>
           <HomeSvg name="pawHeader" width={23} height={23} style={styles.headerPaw} />
           <Text style={styles.wordmark}>PUPPY CONNECT</Text>
-          <Pressable onPress={() => session.status !== 'signedIn' && navigation.navigate('Login')}>
+          <Pressable onPress={onProfilePress}>
             <HomeSvg name="profileAvatar" width={34} height={34} />
           </Pressable>
         </View>
