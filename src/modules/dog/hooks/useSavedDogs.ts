@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuthSession } from '../../../shared/lib/useAuthSession';
 import { fetchSavedDogs } from '../api/savedDogs';
 import type { SavedDog } from '../types';
@@ -9,10 +10,14 @@ export type SavedDogsState =
   | { status: 'error'; message: string }
   | { status: 'ready'; dogs: SavedDog[] };
 
-/** Saved-dogs is login-gated server-side — don't call it while signed out. */
-export function useSavedDogs(limit: number): SavedDogsState {
+/** Saved-dogs is login-gated server-side — don't call it while signed out. Refreshes each
+ * time the screen regains focus, so a dog saved/unsaved elsewhere shows up on return. */
+export function useSavedDogsList(limit: number) {
   const session = useAuthSession();
   const [state, setState] = useState<SavedDogsState>({ status: 'loading' });
+  const [version, setVersion] = useState(0);
+
+  useFocusEffect(useCallback(() => setVersion(v => v + 1), []));
 
   useEffect(() => {
     if (session.status !== 'signedIn') {
@@ -20,7 +25,6 @@ export function useSavedDogs(limit: number): SavedDogsState {
       return;
     }
     let cancelled = false;
-    setState({ status: 'loading' });
 
     (async () => {
       try {
@@ -38,7 +42,15 @@ export function useSavedDogs(limit: number): SavedDogsState {
     return () => {
       cancelled = true;
     };
-  }, [session.status, limit]);
+  }, [session.status, limit, version]);
 
-  return state;
+  const removeLocally = useCallback((dogId: string) => {
+    setState(prev => (prev.status === 'ready' ? { status: 'ready', dogs: prev.dogs.filter(d => d.dogId !== dogId) } : prev));
+  }, []);
+
+  return { state, removeLocally, reload: () => setVersion(v => v + 1) };
+}
+
+export function useSavedDogs(limit: number): SavedDogsState {
+  return useSavedDogsList(limit).state;
 }

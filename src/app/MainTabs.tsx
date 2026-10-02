@@ -2,7 +2,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { createBottomTabNavigator, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HomeScreen } from '../modules/home/HomeScreen';
-import { ShelterListScreen } from '../modules/dog/ShelterListScreen';
+import { ShelterTabScreen } from '../modules/dog/ShelterTabScreen';
+import { SavedFriendsScreen } from '../modules/dog/SavedFriendsScreen';
 import { fonts } from '../shared/lib/fonts';
 import { HomeSvg } from '../modules/home/components/HomeSvg';
 import type { svgAssets } from '../modules/home/assets/svgAssets';
@@ -75,9 +76,9 @@ export function MainTabs() {
       tabBar={props => <PuppyConnectTabBar {...props} />}
     >
       <Tab.Screen name="홈" component={HomeScreen} />
-      <Tab.Screen name="보호소" component={ShelterListScreen} />
+      <Tab.Screen name="보호소" component={ShelterTabScreen} />
       <Tab.Screen name="커뮤니티">{() => <PlaceholderScreen label="커뮤니티" />}</Tab.Screen>
-      <Tab.Screen name="저장한 친구">{() => <PlaceholderScreen label="저장한 친구" />}</Tab.Screen>
+      <Tab.Screen name="저장한 친구" component={SavedFriendsScreen} />
       <Tab.Screen name="대화">{() => <PlaceholderScreen label="대화" />}</Tab.Screen>
     </Tab.Navigator>
   );
