@@ -5,7 +5,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Camera, Check, MapPin, Plus, X } from 'lucide-react-native';
 import { fonts } from '../../shared/lib/fonts';
 import { generateClientMessageId } from '../../shared/lib/clientId';
-import { getCurrentCoords } from '../../shared/lib/deviceLocation';
 import { pickPhotos, uploadCommunityPhoto } from '../../shared/lib/photoUpload';
 import { writeErrorMessage } from '../../shared/lib/communityErrors';
 import { ActionSheet, PermissionSheet, SheetButton } from '../../shared/ui/ActionSheet';
@@ -15,6 +14,7 @@ import { createCommunityPost, fetchCommunityPost, fetchMyDrafts, publishCommunit
 import { useCommunityRegion } from './hooks/useCommunityRegion';
 import { DateTimeFields } from './components/DateTimeField';
 import { FieldLabel, inputStyles } from './components/FormBits';
+import { LocationPicker } from './components/LocationPicker';
 import { PhotoStrip } from './components/PhotoStrip';
 import { ScreenFrame } from './components/ScreenFrame';
 import {
@@ -68,9 +68,8 @@ export function CommunityComposeScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<'draft' | 'publish' | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [locating, setLocating] = useState(false);
+  const [pickingPlace, setPickingPlace] = useState(false);
   const [photoDenied, setPhotoDenied] = useState(false);
-  const [locationDenied, setLocationDenied] = useState(false);
   const [leaveAction, setLeaveAction] = useState<(() => void) | null>(null);
   const dirty = useRef(false);
   const leaving = useRef(false);
@@ -188,19 +187,6 @@ export function CommunityComposeScreen() {
     }
   };
 
-  const locateHere = async () => {
-    setLocating(true);
-    try {
-      const coords = await getCurrentCoords();
-      update({ latitude: coords.latitude, longitude: coords.longitude, placeLabel: form.placeLabel || '현재 위치 근처' });
-    } catch (failure) {
-      if (failure === 'DENIED') setLocationDenied(true);
-      else setError('현재 위치를 가져오지 못했어요. 장소 이름을 직접 입력해 주세요.');
-    } finally {
-      setLocating(false);
-    }
-  };
-
   const addFeature = () => {
     const next = cleanFeatures([...form.features, featureDraft]);
     setFeatureDraft('');
@@ -268,8 +254,8 @@ export function CommunityComposeScreen() {
               <View style={styles.placeBox}>
                 <MapPin size={15} color="#b4a0bc" strokeWidth={1.8} />
                 <TextInput style={styles.placeInput} value={form.placeLabel} onChangeText={placeLabel => update({ placeLabel })} placeholder="예: 춘천시 석사동" placeholderTextColor={placeholderColor} maxLength={200} />
-                <Pressable style={styles.placeButton} onPress={locateHere} disabled={locating}>
-                  {locating ? <ActivityIndicator size="small" color="#a38bac" /> : <Text style={styles.placeButtonText}>{form.latitude !== null ? '현재 위치 ✓' : '현재 위치'}</Text>}
+                <Pressable style={styles.placeButton} onPress={() => setPickingPlace(true)}>
+                  <Text style={styles.placeButtonText}>{form.latitude !== null ? '지도 선택 ✓' : '지도에서 선택'}</Text>
                 </Pressable>
               </View>
               <FieldLabel text={when} />
@@ -386,16 +372,18 @@ export function CommunityComposeScreen() {
         onLink={() => setPhotoDenied(false)}
         onClose={() => setPhotoDenied(false)}
       />
-      <PermissionSheet
-        visible={locationDenied}
-        icon={<MapPin size={26} color="#a48db7" strokeWidth={1.7} />}
-        title="위치 접근이 꺼져 있어요"
-        message={'현재 위치를 남기려면 설정에서 위치 접근을 허용해 주세요.\n장소 이름을 직접 입력해도 돼요.'}
-        note="작성 중인 글은 그대로 유지돼요."
-        primaryLabel="장소 직접 입력"
-        onPrimary={() => setLocationDenied(false)}
-        onClose={() => setLocationDenied(false)}
-      />
+      {pickingPlace && (
+        <LocationPicker
+          title={place}
+          initial={form.latitude !== null && form.longitude !== null ? { latitude: form.latitude, longitude: form.longitude } : null}
+          initialLabel={form.placeLabel}
+          onClose={() => setPickingPlace(false)}
+          onConfirm={picked => {
+            update({ latitude: picked.latitude, longitude: picked.longitude, placeLabel: picked.label });
+            setPickingPlace(false);
+          }}
+        />
+      )}
     </ScreenFrame>
   );
 }

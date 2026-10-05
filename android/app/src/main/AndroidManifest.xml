@@ -13,6 +13,8 @@
       android:theme="@style/AppTheme"
       android:usesCleartextTraffic="${usesCleartextTraffic}"
       android:supportsRtl="true">
+      <!-- 네이버 클라우드 Maps Client ID — 번들 ID/패키지명에 묶인 공개용 값(시크릿 아님) -->
+      <meta-data android:name="com.naver.maps.map.NCP_KEY_ID" android:value="kej5hd9w1i" />
       <activity
         android:name=".MainActivity"
         android:label="@string/app_name"

@@ -42,3 +42,7 @@ jest.mock('@react-native-async-storage/async-storage', () => {
   };
   return { __esModule: true, default: api, ...api };
 });
+jest.mock('@mj-studio/react-native-naver-map', () => {
+  const { View } = require('react-native');
+  return { NaverMapView: View, NaverMapMarkerOverlay: View };
+});
