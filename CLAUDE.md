@@ -63,17 +63,10 @@ cd ios && pod install   # 네이티브 의존성 변경 후
   이 환경(RN 0.87 + Fabric + react-native-screens native-stack)에서 부모/자식이 동일 style
   객체 참조를 공유하면 `<Text>`가 화면에 전혀 그려지지 않는(배경은 정상, 글자만 안 보이는)
   버그가 재현됨. `StyleSheet.create`든 인라인 객체든 상관없이, 컴포넌트마다 별개의 객체를 쓸 것.
-- **`__tests__/App.test.tsx` (RN 기본 스모크 테스트)는 현재 실패함** — F-14에서 `jest.config.js`의
-  `transformIgnorePatterns`에 `react-native-url-polyfill`/`@react-native-async-storage`를 추가하고
-  `lucide-react-native`는 `moduleNameMapper`로 CJS 빌드(`dist/cjs/...js`)에 매핑해서 ESM `import`
-  파싱 실패(이전에 기록된 원인)는 고쳤다. 그런데 그 너머에서 **진짜 reanimated/worklets mock 버그**가
-  나왔다 — `GameScreen.tsx` → `Joystick.tsx`의 `react-native-reanimated` import가 mock으로 치환되는데
-  (`moduleNameMapper`의 `react-native-reanimated/mock`), 그 mock 자체가 초기화 중
-  `"[Reanimated] setCSSEventHandler is not available in JSReanimated"`로 던진다. 2026.09.25 리뷰에서
-  "reanimated mock 버그로 기록했던 건 오진, 실제 원인은 url-polyfill"이라고 정리했던 건 **그 리뷰 시점에
-  url-polyfill 에러가 먼저 터져서 이 reanimated 에러까지 도달한 적이 없었기 때문** — 둘 다 실재하는
-  별개의 버그다. reanimated mock 쪽은 이번 F-14 범위(홈 화면) 밖이라 안 건드림. `tsc`/`lint`는 정상,
-  PR 게이트는 그 둘만 요구하므로 당장 막히진 않음.
+- **네이티브 모듈은 Jest에서 `jest.setup.js`로 목킹** — geolocation·keychain·async-storage·image-picker·clipboard·
+  datetimepicker와 `react-native-reanimated`(4.x 자체 mock이 초기화 중 `setCSSEventHandler` 오류를 던져서
+  Joystick용 최소 대체 구현으로 교체). 새 네이티브 모듈을 import 시점에 쓰는 코드를 추가하면 `App.test.tsx`가
+  "doesn't seem to be linked"로 깨지니 여기에 목을 추가할 것.
 
 ## 확인 필요한 미결 사항
 [docs/project-overview.md](./docs/project-overview.md) 하단 "확인 필요" 섹션 참고 — 스프라이트 규격,

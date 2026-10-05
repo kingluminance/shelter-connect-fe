@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable,
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { ChevronLeft, ChevronRight, MapPin, Paperclip, SendHorizontal, User } from 'lucide-react-native';
+import { Camera, ChevronLeft, ChevronRight, MapPin, Paperclip, SendHorizontal, User } from 'lucide-react-native';
 import { useMediaUrl } from '../community/hooks/useMediaUrl';
 import { formatClock, formatDayHeader, isSameDay } from '../../shared/lib/chatTime';
 import { fonts } from '../../shared/lib/fonts';
@@ -210,20 +210,22 @@ export function InquiryRoomScreen() {
 
       <PermissionSheet
         visible={photoDenied}
+        icon={<Camera size={26} color="#a48db7" strokeWidth={1.7} />}
         title="사진 접근이 꺼져 있어요"
-        message="사진을 보내려면 설정에서 사진 접근을 허용해 주세요."
-        retryLabel="사진 다시 선택"
-        onRetry={sendPhoto}
-        alternativeLabel="대화로 돌아가기"
-        onAlternative={() => setPhotoDenied(false)}
+        message={'사진을 다시 선택하거나\n기기 설정에서 사진 접근을 허용해 주세요.'}
+        primaryLabel="사진 다시 선택"
+        onPrimary={sendPhoto}
+        linkLabel="대화로 돌아가기"
+        onLink={() => setPhotoDenied(false)}
         onClose={() => setPhotoDenied(false)}
       />
       <PermissionSheet
         visible={locationDenied}
+        icon={<MapPin size={26} color="#a48db7" strokeWidth={1.7} />}
         title="위치 접근이 꺼져 있어요"
-        message="내 위치를 보내려면 설정에서 위치 접근을 허용해 주세요."
-        alternativeLabel="대화로 돌아가기"
-        onAlternative={() => setLocationDenied(false)}
+        message={'내 위치를 보내려면 설정에서 위치 접근을 허용해 주세요.'}
+        primaryLabel="대화로 돌아가기"
+        onPrimary={() => setLocationDenied(false)}
         onClose={() => setLocationDenied(false)}
       />
     </KeyboardAvoidingView>

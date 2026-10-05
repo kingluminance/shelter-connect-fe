@@ -2,17 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { LocateFixed, MapPin, Plus, X } from 'lucide-react-native';
+import { Camera, Check, MapPin, Plus, X } from 'lucide-react-native';
 import { fonts } from '../../shared/lib/fonts';
 import { generateClientMessageId } from '../../shared/lib/clientId';
 import { getCurrentCoords } from '../../shared/lib/deviceLocation';
 import { pickPhotos, uploadCommunityPhoto } from '../../shared/lib/photoUpload';
 import { writeErrorMessage } from '../../shared/lib/communityErrors';
 import { ActionSheet, PermissionSheet, SheetButton } from '../../shared/ui/ActionSheet';
+import { PuppyButton } from '../../shared/ui/PuppyButton';
 import { ConnectionErrorView } from '../../shared/ui/ConnectionErrorView';
 import { createCommunityPost, fetchCommunityPost, fetchMyDrafts, publishCommunityPost, updateCommunityPost } from './api/posts';
 import { useCommunityRegion } from './hooks/useCommunityRegion';
-import { DateTimeField } from './components/DateTimeField';
+import { DateTimeFields } from './components/DateTimeField';
+import { FieldLabel, inputStyles } from './components/FormBits';
 import { PhotoStrip } from './components/PhotoStrip';
 import { ScreenFrame } from './components/ScreenFrame';
 import {
@@ -36,6 +38,17 @@ import type { CommunityCategory, CommunityPost } from './types';
 import type { RootStackParamList } from '../../app/navigation';
 
 const CATEGORIES: CommunityCategory[] = ['LOST', 'FOUND', 'NEIGHBOR_NEWS'];
+// Figma 08: each category picks its own accent (찾고 있어요 pink, 발견했어요 green, 동네 소식 lavender).
+const CATEGORY_TONE: Record<CommunityCategory, { bg: string; border: string; text: string }> = {
+  LOST: { bg: '#f5e5e9', border: '#d9adb9', text: '#ae788c' },
+  FOUND: { bg: '#eaf0e3', border: '#b3c6a5', text: '#8a9e77' },
+  NEIGHBOR_NEWS: { bg: '#ede2f3', border: '#cfbce0', text: '#8c749f' },
+};
+const PHOTO_HINT: Record<CommunityCategory, string> = {
+  LOST: '얼굴과 몸이 잘 보이는 사진',
+  FOUND: '얼굴과 몸이 잘 보이는 사진',
+  NEIGHBOR_NEWS: '동네 소식에 어울리는 사진',
+};
 
 // Figma "08 글쓰기" (pencil HknIP 찾기 / GwUpO 발견 / eGRkK 동네 소식) + 22 사진 권한 시트.
 // Create, continue a draft, or edit a published post (category is fixed once published).
@@ -50,6 +63,7 @@ export function CommunityComposeScreen() {
   const [load, setLoad] = useState<'loading' | 'ready' | 'error'>(params?.postId ? 'loading' : 'ready');
   const [offerDraft, setOfferDraft] = useState<CommunityPost | null>(null);
   const [featureDraft, setFeatureDraft] = useState('');
+  const [addingFeature, setAddingFeature] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<'draft' | 'publish' | null>(null);
@@ -174,7 +188,7 @@ export function CommunityComposeScreen() {
     }
   };
 
-  const useCurrentLocation = async () => {
+  const locateHere = async () => {
     setLocating(true);
     try {
       const coords = await getCurrentCoords();
@@ -202,9 +216,15 @@ export function CommunityComposeScreen() {
 
   const place = form.category === 'LOST' ? '마지막으로 본 곳' : '발견한 곳';
   const when = form.category === 'LOST' ? '마지막으로 본 날짜·시간' : '발견한 날짜·시간';
+  const placeholderColor = '#b0a5af';
+  const saveDraft = (
+    <Pressable onPress={() => submit('draft')} disabled={!!busy || uploading} hitSlop={10}>
+      {busy === 'draft' ? <ActivityIndicator size="small" color="#a08bab" /> : <Text style={styles.draftLink}>임시저장</Text>}
+    </Pressable>
+  );
 
   return (
-    <ScreenFrame title={editingPublished ? '글 수정' : '글쓰기'}>
+    <ScreenFrame title="글 쓰기" right={!editingPublished && load === 'ready' ? saveDraft : undefined}>
       {load === 'loading' && <ActivityIndicator style={styles.gap} />}
       {load === 'error' && <ConnectionErrorView message="글을 불러오지 못했어요." onRetry={() => navigation.replace('CommunityCompose', params)} onBack={() => navigation.goBack()} />}
       {load === 'ready' && (
@@ -226,81 +246,113 @@ export function CommunityComposeScreen() {
           <View style={styles.tabs}>
             {CATEGORIES.map(category => {
               const active = form.category === category;
+              const tone = CATEGORY_TONE[category];
               return (
-                <Pressable key={category} style={[styles.tab, active && styles.tabActive]} onPress={() => update({ category })} disabled={editingPublished && !active}>
-                  <Text style={[styles.tabText, active && styles.tabTextActive]}>{CATEGORY_LABEL[category]}</Text>
+                <Pressable key={category} style={[styles.tab, active && { backgroundColor: tone.bg, borderColor: tone.border }]} onPress={() => update({ category })} disabled={editingPublished && !active}>
+                  {active && <Check size={10} color={tone.text} strokeWidth={2.4} />}
+                  <Text style={[styles.tabText, active && { color: tone.text }]}>{CATEGORY_LABEL[category]}</Text>
                 </Pressable>
               );
             })}
           </View>
 
-          <Label text={`사진 (${form.photos.length}/${PHOTOS_MAX})`} />
+          <FieldLabel large text="사진" hint={PHOTO_HINT[form.category]} counter={`${form.photos.length} / ${PHOTOS_MAX}`} />
           <PhotoStrip photos={form.photos} max={PHOTOS_MAX} uploading={uploading} onAdd={addPhotos} onRemove={id => update({ photos: form.photos.filter(p => p.mediaId !== id) })} />
 
-          <Label text="제목" counter={`${form.title.length}/${TITLE_MAX}`} />
-          <TextInput style={styles.input} value={form.title} onChangeText={title => update({ title })} placeholder="예: 흰색 푸들을 찾고 있어요" placeholderTextColor="#b0a2b7" maxLength={TITLE_MAX} />
+          <FieldLabel text="제목" counter={`${form.title.length} / ${TITLE_MAX}`} />
+          <TextInput style={inputStyles.input} value={form.title} onChangeText={title => update({ title })} placeholder="예: 갈색 강아지를 찾고 있어요" placeholderTextColor={placeholderColor} maxLength={TITLE_MAX} />
 
           {needsPlace(form.category) ? (
             <>
-              <Label text={place} />
-              <View style={styles.placeRow}>
-                <TextInput style={[styles.input, styles.placeInput]} value={form.placeLabel} onChangeText={placeLabel => update({ placeLabel })} placeholder="예: 석사동 공원 입구" placeholderTextColor="#b0a2b7" maxLength={200} />
-                <Pressable style={styles.locate} onPress={useCurrentLocation} disabled={locating}>
-                  {locating ? <ActivityIndicator color="#a58faf" /> : <LocateFixed size={18} color={form.latitude !== null ? '#9679aa' : '#b9a9c2'} strokeWidth={1.8} />}
+              <FieldLabel text={place} />
+              <View style={styles.placeBox}>
+                <MapPin size={15} color="#b4a0bc" strokeWidth={1.8} />
+                <TextInput style={styles.placeInput} value={form.placeLabel} onChangeText={placeLabel => update({ placeLabel })} placeholder="예: 춘천시 석사동" placeholderTextColor={placeholderColor} maxLength={200} />
+                <Pressable style={styles.placeButton} onPress={locateHere} disabled={locating}>
+                  {locating ? <ActivityIndicator size="small" color="#a38bac" /> : <Text style={styles.placeButtonText}>{form.latitude !== null ? '현재 위치 ✓' : '현재 위치'}</Text>}
                 </Pressable>
               </View>
-              {form.latitude !== null && (
-                <View style={styles.coordsRow}>
-                  <MapPin size={12} color="#a58faf" strokeWidth={1.8} />
-                  <Text style={styles.coordsText}>현재 위치를 함께 남겨요</Text>
-                  <Pressable onPress={() => update({ latitude: null, longitude: null })} hitSlop={8}>
-                    <Text style={styles.coordsClear}>지우기</Text>
-                  </Pressable>
-                </View>
-              )}
-              <Label text={when} />
-              <DateTimeField value={form.occurredAt} onChange={occurredAt => update({ occurredAt })} placeholder="날짜·시간을 골라 주세요" />
+              <FieldLabel text={when} />
+              <DateTimeFields value={form.occurredAt} onChange={occurredAt => update({ occurredAt })} />
             </>
           ) : (
             <>
-              <Label text="동네" />
-              <TextInput style={styles.input} value={form.regionLabel} onChangeText={regionLabel => update({ regionLabel })} placeholder={myRegion ?? '예: 춘천시 후평동'} placeholderTextColor="#b0a2b7" maxLength={100} />
+              <FieldLabel text="동네" />
+              <View style={styles.placeBox}>
+                <MapPin size={15} color="#b4a0bc" strokeWidth={1.8} />
+                <TextInput style={styles.placeInput} value={form.regionLabel} onChangeText={regionLabel => update({ regionLabel })} placeholder={myRegion ?? '예: 춘천시 후평동'} placeholderTextColor={placeholderColor} maxLength={100} />
+                {!!myRegion && form.regionLabel !== myRegion && (
+                  <Pressable style={styles.placeButton} onPress={() => update({ regionLabel: myRegion })}>
+                    <Text style={styles.placeButtonText}>내 동네</Text>
+                  </Pressable>
+                )}
+              </View>
             </>
           )}
 
-          <Label text="특징" counter={`${form.features.length}/${FEATURES_MAX}`} />
-          <View style={styles.featureRow}>
-            <TextInput style={[styles.input, styles.featureInput]} value={featureDraft} onChangeText={setFeatureDraft} placeholder="예: 갈색 털, 빨간 목줄" placeholderTextColor="#b0a2b7" maxLength={FEATURE_MAX} returnKeyType="done" onSubmitEditing={addFeature} blurOnSubmit={false} />
-            <Pressable style={styles.featureAdd} onPress={addFeature} disabled={form.features.length >= FEATURES_MAX}>
-              <Plus size={18} color="#9679aa" strokeWidth={2} />
-            </Pressable>
-          </View>
-          {form.features.length > 0 && (
-            <View style={styles.chips}>
-              {form.features.map(feature => (
-                <Pressable key={feature} style={styles.chip} onPress={() => update({ features: form.features.filter(f => f !== feature) })}>
-                  <Text style={styles.chipText}>{feature}</Text>
-                  <X size={11} color="#a08dac" strokeWidth={2} />
-                </Pressable>
-              ))}
-            </View>
+          {needsPlace(form.category) && (
+            <>
+              <FieldLabel text="눈에 띄는 특징" counter="선택" />
+              <View style={styles.chips}>
+                {form.features.map(feature => (
+                  <Pressable key={feature} style={styles.chip} onPress={() => update({ features: form.features.filter(f => f !== feature) })}>
+                    <Text style={styles.chipText}>{feature}</Text>
+                    <X size={11} color="#a18aab" strokeWidth={2} />
+                  </Pressable>
+                ))}
+                {form.features.length < FEATURES_MAX &&
+                  (addingFeature ? (
+                    <TextInput
+                      style={styles.featureInput}
+                      value={featureDraft}
+                      onChangeText={setFeatureDraft}
+                      placeholder="예: 갈색 털"
+                      placeholderTextColor="#b29dbd"
+                      maxLength={FEATURE_MAX}
+                      returnKeyType="done"
+                      autoFocus
+                      onSubmitEditing={() => {
+                        addFeature();
+                        setAddingFeature(false);
+                      }}
+                      onBlur={() => {
+                        addFeature();
+                        setAddingFeature(false);
+                      }}
+                    />
+                  ) : (
+                    <Pressable style={styles.addChip} onPress={() => setAddingFeature(true)}>
+                      <Plus size={13} color="#b29dbd" strokeWidth={2} />
+                      <Text style={styles.addChipText}>특징 추가</Text>
+                    </Pressable>
+                  ))}
+              </View>
+            </>
           )}
 
-          <Label text="자세한 내용" counter={`${form.text.length}/${TEXT_MAX.toLocaleString()}`} />
-          <TextInput style={[styles.input, styles.textArea]} value={form.text} onChangeText={text => update({ text })} placeholder="상황을 자세히 알려 주세요" placeholderTextColor="#b0a2b7" multiline textAlignVertical="top" maxLength={TEXT_MAX} />
+          <FieldLabel text="자세한 내용" counter={`${form.text.length} / ${TEXT_MAX.toLocaleString()}`} />
+          <TextInput
+            style={[inputStyles.input, inputStyles.area, form.category === 'NEIGHBOR_NEWS' ? styles.areaTall : styles.area]}
+            value={form.text}
+            onChangeText={text => update({ text })}
+            placeholder={form.category === 'NEIGHBOR_NEWS' ? '동네 이웃들에게 전하고 싶은 소식을 적어주세요.' : '상황을 자세히 알려 주세요'}
+            placeholderTextColor={placeholderColor}
+            multiline
+            textAlignVertical="top"
+            maxLength={TEXT_MAX}
+          />
 
           {!!error && <Text style={styles.error}>{error}</Text>}
           {!!notice && <Text style={styles.notice}>{notice}</Text>}
 
-          <View style={styles.actions}>
-            {!editingPublished && (
-              <Pressable style={[styles.draftButton, !!busy && styles.disabled]} onPress={() => submit('draft')} disabled={!!busy || uploading}>
-                {busy === 'draft' ? <ActivityIndicator color="#98859e" /> : <Text style={styles.draftButtonText}>임시저장</Text>}
-              </Pressable>
-            )}
-            <Pressable style={[styles.publishButton, (!!busy || uploading) && styles.disabled]} onPress={() => submit('publish')} disabled={!!busy || uploading}>
-              {busy === 'publish' ? <ActivityIndicator color="#89709b" /> : <Text style={styles.publishText}>{editingPublished ? '수정하기' : '등록하기'}</Text>}
-            </Pressable>
+          <View style={styles.submit}>
+            <PuppyButton
+              label={editingPublished ? '수정하기' : '등록하기'}
+              icon={<Check size={18} color="#887099" strokeWidth={2} />}
+              onPress={() => submit('publish')}
+              busy={busy === 'publish'}
+              disabled={!!busy || uploading}
+            />
           </View>
         </View>
       )}
@@ -324,68 +376,52 @@ export function CommunityComposeScreen() {
 
       <PermissionSheet
         visible={photoDenied}
+        icon={<Camera size={26} color="#a48db7" strokeWidth={1.7} />}
         title="사진 접근이 꺼져 있어요"
-        message={'사진을 올리려면 설정에서 사진 접근을 허용해 주세요.\n작성 중인 내용은 그대로 남아 있어요.'}
-        retryLabel="사진 다시 선택"
-        onRetry={addPhotos}
-        alternativeLabel="작성 중인 글로 돌아가기"
-        onAlternative={() => setPhotoDenied(false)}
+        message={'사진을 다시 선택하거나\n기기 설정에서 사진 접근을 허용해 주세요.'}
+        note="작성 중인 글은 그대로 유지돼요."
+        primaryLabel="사진 다시 선택"
+        onPrimary={addPhotos}
+        linkLabel="작성 중인 글로 돌아가기"
+        onLink={() => setPhotoDenied(false)}
         onClose={() => setPhotoDenied(false)}
       />
       <PermissionSheet
         visible={locationDenied}
+        icon={<MapPin size={26} color="#a48db7" strokeWidth={1.7} />}
         title="위치 접근이 꺼져 있어요"
         message={'현재 위치를 남기려면 설정에서 위치 접근을 허용해 주세요.\n장소 이름을 직접 입력해도 돼요.'}
-        alternativeLabel="장소 직접 입력"
-        onAlternative={() => setLocationDenied(false)}
+        note="작성 중인 글은 그대로 유지돼요."
+        primaryLabel="장소 직접 입력"
+        onPrimary={() => setLocationDenied(false)}
         onClose={() => setLocationDenied(false)}
       />
     </ScreenFrame>
   );
 }
 
-function Label({ text, counter }: { text: string; counter?: string }) {
-  return (
-    <View style={styles.labelRow}>
-      <Text style={styles.label}>{text}</Text>
-      {!!counter && <Text style={styles.counter}>{counter}</Text>}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   gap: { marginTop: 40 },
+  draftLink: { fontFamily: fonts.body, fontSize: 10.5, color: '#a08bab' },
   draftBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 44, paddingHorizontal: 14, marginBottom: 14, backgroundColor: '#f0f3e8', borderRadius: 12 },
   draftText: { flex: 1, fontFamily: fonts.body, fontSize: 11, color: '#92a17f' },
   draftAction: { fontFamily: fonts.pixel, fontSize: 11, color: '#7f9a68' },
   tabs: { flexDirection: 'row', gap: 8 },
-  tab: { flex: 1, height: 38, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fffefb', borderWidth: 1, borderColor: '#e0d5e4', borderRadius: 12 },
-  tabActive: { backgroundColor: '#e9dcf2', borderColor: '#c6b0d8' },
-  tabText: { fontFamily: fonts.pixel, fontSize: 11, color: '#ae9db9' },
-  tabTextActive: { color: '#9679aa' },
-  labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 22, marginBottom: 9 },
-  label: { fontFamily: fonts.pixel, fontSize: 13, lineHeight: 18, color: '#7b7187' },
-  counter: { fontFamily: fonts.body, fontSize: 10, color: '#b0a2b7' },
-  input: { height: 48, paddingHorizontal: 16, backgroundColor: '#fffefa', borderWidth: 0.9, borderColor: '#e0d6e6', borderRadius: 13, fontFamily: fonts.body, fontSize: 13, color: '#6b6878' },
-  placeRow: { flexDirection: 'row', gap: 10 },
-  placeInput: { flex: 1 },
-  locate: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fffefa', borderWidth: 0.9, borderColor: '#e0d6e6', borderRadius: 13 },
-  coordsRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, marginLeft: 2 },
-  coordsText: { fontFamily: fonts.body, fontSize: 10.5, color: '#a58faf' },
-  coordsClear: { fontFamily: fonts.pixel, fontSize: 10, color: '#b0a2b7', marginLeft: 6 },
-  featureRow: { flexDirection: 'row', gap: 10 },
-  featureInput: { flex: 1 },
-  featureAdd: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0ebf4', borderRadius: 13 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  chip: { height: 28, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f0ebf4', borderRadius: 10 },
-  chipText: { fontFamily: fonts.pixel, fontSize: 10.5, color: '#a08dac' },
-  textArea: { height: 150, paddingTop: 14, lineHeight: 20 },
+  tab: { flex: 1, height: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#fffefa', borderWidth: 1, borderColor: '#dedad9', borderRadius: 12 },
+  tabText: { fontFamily: fonts.pixel, fontSize: 11, color: '#9d929f' },
+  placeBox: { height: 43, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 16, paddingRight: 9, backgroundColor: '#fffefa', borderWidth: 1, borderColor: '#e1d8d1', borderRadius: 12 },
+  placeInput: { flex: 1, padding: 0, fontFamily: fonts.body, fontSize: 12, color: '#8b808f' },
+  placeButton: { minWidth: 67, height: 25, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1ebf5', borderRadius: 8 },
+  placeButtonText: { fontFamily: fonts.body, fontSize: 9.5, color: '#a38bac' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { height: 29, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f0e8f4', borderWidth: 1, borderColor: '#e4d8ea', borderRadius: 10 },
+  chipText: { fontFamily: fonts.body, fontSize: 10.5, color: '#a18aab' },
+  addChip: { height: 29, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fffefa', borderWidth: 1, borderColor: '#dcd1e2', borderRadius: 10 },
+  addChipText: { fontFamily: fonts.body, fontSize: 10.5, color: '#b29dbd' },
+  featureInput: { height: 29, minWidth: 100, paddingHorizontal: 14, paddingVertical: 0, backgroundColor: '#fffefa', borderWidth: 1, borderColor: '#dcd1e2', borderRadius: 10, fontFamily: fonts.body, fontSize: 10.5, color: '#a18aab' },
+  area: { height: 106 },
+  areaTall: { height: 200 },
   error: { fontFamily: fonts.body, fontSize: 12, lineHeight: 17, color: '#c0526b', marginTop: 16 },
   notice: { fontFamily: fonts.body, fontSize: 12, color: '#7f9a68', marginTop: 16 },
-  actions: { flexDirection: 'row', gap: 12, marginTop: 24 },
-  draftButton: { flex: 1, height: 51, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fffdf8', borderWidth: 1, borderColor: '#ddd2e3', borderRadius: 14 },
-  draftButtonText: { fontFamily: fonts.pixel, fontSize: 13, color: '#98859e' },
-  publishButton: { flex: 2, height: 51, alignItems: 'center', justifyContent: 'center', backgroundColor: '#e5d9f0', borderWidth: 1, borderColor: '#cdbbdb', borderRadius: 14 },
-  publishText: { fontFamily: fonts.pixel, fontSize: 13, color: '#89709b' },
-  disabled: { opacity: 0.55 },
+  submit: { marginTop: 28 },
 });
