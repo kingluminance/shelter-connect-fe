@@ -122,14 +122,13 @@ export function ballControl(state: BallPlayState, dog: Point, dogName: string, p
   const busy: Partial<Record<BallPhase, string>> = { RECEIVING: '받는 중', WINDUP: '던지는 중', FLIGHT: '날아가는 중', FETCH: '가져오는 중', PICK: '줍는 중', RETURN: '가져오는 중' };
   const busyLabel = busy[state.phase];
   if (busyLabel) return { visible: true, enabled: false, label: busyLabel, action: null };
-  if (state.phase === 'READY') {
-    if (distance > THROW_RANGE) return { visible: true, enabled: false, label: `${dogName} 가까이 가기`, action: null };
+  // Holding / offering: the button only shows once the player is within reach (prototype refreshBallControl
+  // hides it otherwise) — walking toward the dog is the cue, not a "go closer" button.
+  if (state.phase === 'READY' && distance <= THROW_RANGE) {
     return { visible: true, enabled: canThrow, label: canThrow ? '공 던지기' : '넓은 곳에서 던지기', action: canThrow ? 'throw' : null };
   }
-  if (state.phase === 'OFFER') {
-    return distance <= RECEIVE_DISTANCE
-      ? { visible: true, enabled: true, label: '공 받기', action: 'receive' }
-      : { visible: true, enabled: false, label: `${dogName} 가까이 가기`, action: null };
+  if (state.phase === 'OFFER' && distance <= RECEIVE_DISTANCE) {
+    return { visible: true, enabled: true, label: '공 받기', action: 'receive' };
   }
   return { visible: false, enabled: false, label: '', action: null };
 }

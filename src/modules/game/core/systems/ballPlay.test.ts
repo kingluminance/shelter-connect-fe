@@ -135,7 +135,8 @@ describe('ballControl', () => {
   it('labels the button by phase', () => {
     const base = createBallPlayState(near.x, near.y);
     expect(ballControl({ ...base, phase: 'OFFER' }, near, '두부', player, true)).toMatchObject({ label: '공 받기', enabled: true, action: 'receive' });
-    expect(ballControl({ ...base, phase: 'OFFER' }, { x: 60, y: 200 }, '두부', player, true)).toMatchObject({ label: '두부 가까이 가기', enabled: false });
+    expect(ballControl({ ...base, phase: 'OFFER' }, { x: 60, y: 200 }, '두부', player, true).visible).toBe(false);
+    expect(ballControl({ ...base, phase: 'READY' }, { x: 60, y: 200 }, '두부', player, true).visible).toBe(false);
     expect(ballControl({ ...base, phase: 'READY' }, near, '두부', player, true)).toMatchObject({ label: '공 던지기', enabled: true, action: 'throw' });
     expect(ballControl({ ...base, phase: 'READY' }, near, '두부', player, false)).toMatchObject({ label: '넓은 곳에서 던지기', enabled: false });
     expect(ballControl({ ...base, phase: 'FLIGHT' }, near, '두부', player, true)).toMatchObject({ label: '날아가는 중', enabled: false });
