@@ -27,7 +27,7 @@ import { DogSprite } from './core/entities/DogSprite';
 import { SpriteFrame } from './core/entities/SpriteFrame';
 import { createDogAgent, tickDog, type DogAgent, type DogState } from './core/systems/dogStateMachine';
 import { movementFacing } from './core/systems/spritePlayback';
-import type { DogSpriteDirection } from '../dog/types';
+import type { DogBehaviorSettings, DogSpriteDirection } from '../dog/types';
 import {
   createBallPlayState,
   isBallPlayActive,
@@ -86,9 +86,12 @@ function clamp(value: number, min: number, max: number) {
 
 const DEFAULT_DOG_FACING: DogSpriteDirection = 'DOWN';
 
-// GRABBING/DROPPING have no dedicated art either — borrow SNIFF's head-down idle
-// column since a dog biting/dropping a ball reads reasonably close to that pose.
-function ballPoseState(phase: BallPlayState['phase']): DogState {
+// Ball-play poses (the backend generates no ball-carrying sheet — "공을 물고 있는 별도 동작을 생성하지
+// 않는다"): chasing runs (WALK when the shelter gave RUN no weight, like tickBallPlay's speed), bringing
+// it back walks, grabbing/dropping borrow SNIFF's head-down pose, waiting for the throw to land idles.
+function ballPoseState(phase: BallPlayState['phase'], settings: DogBehaviorSettings): DogState {
+  if (phase === 'CHASING') return settings.actions.RUN.weight > 0 ? 'RUN' : 'WALK';
+  if (phase === 'RETURNING') return 'WALK';
   return phase === 'GRABBING' || phase === 'DROPPING' ? 'SNIFF' : 'IDLE';
 }
 
@@ -395,7 +398,7 @@ export function GameScreen() {
           dog={dog}
           // TEMPORARY, Phase 1 verification only — see localManifest.ts's header.
           manifest={localDogAssetManifest}
-          renderStateOverride={ballActive ? ballPoseState(ball!.phase) : undefined}
+          renderStateOverride={ballActive && dogMeta[i] ? ballPoseState(ball!.phase, dogMeta[i].behavior.settings) : undefined}
           direction={facing}
           envAnimFrame={animFrame}
           identity={identity}
@@ -440,7 +443,8 @@ export function GameScreen() {
           <Circle
             key={`ball-${dogMeta[i]?.id ?? i}`}
             cx={toScreenX(ball.ballX)}
-            cy={toScreenY(ball.ballY)}
+            // carried in the mouth (RETURNING) — lifted off the foot point the dog is tracked at
+            cy={toScreenY(ball.ballY) - (ball.phase === 'RETURNING' ? 9 * scale : 0)}
             r={BALL_DISPLAY_RADIUS * scale}
             color="#d9a441"
           />

@@ -83,8 +83,10 @@ Skia 캔버스에 렌더 (도트 스프라이트, `core/assets/dog/dogWalkAtlas.
 - 공놀이 중엔 `tickDog`(8종 배회 FSM)을 아예 호출하지 않음 — 끝나면 이전 상태·쿨다운에서 그대로 재개
 - 던지는 방향은 플레이어의 마지막 이동 방향(`lastDirectionRef`), 고정 거리(`THROW_DISTANCE`)만큼
 - 공 자체도 depth 정렬 대상(`ball.ballY`)이라 props 앞/뒤 렌더링이 강아지·플레이어와 일관됨
-- **실제 배포 서버의 3마리는 전부 `basis: DEFAULT`(확인된 행동 없음) → `chaseEnabled: false`라 지금은
-  공 던지기 버튼이 뜨지 않음** — 그래픽팀이 아니라 보호소가 실제 행동을 확인·저장해야 나타남
+- 실제 배포 서버 강아지들은 전부 `basis: DEFAULT` → 서버값대로면 `chaseEnabled: false`라 공 던지기 버튼이 안 뜬다.
+  **데모용으로 `useShelterDogs`의 `DEMO_BALL_PLAY`가 DEFAULT 강아지의 공놀이(가져오기 포함)를 켠다**(`normalizeBehavior`의 `demoBallPlay`).
+  보호소가 확정한(CONFIRMED) 강아지나 `BALL_CHASE.enabled`인 강아지는 항상 서버값을 따른다 — 확정값이 들어오면 플래그를 지울 것
+- 공놀이 자세: 쫓을 땐 RUN(RUN 비중 0이면 WALK) · 물어오는 중엔 WALK + 공을 입 높이로 들어 올려 그림 · 물기/내려놓기는 SNIFF · 던지고 기다릴 땐 IDLE
 - 테스트: `ballPlay.test.ts` — 거부 조건 2개 + returnEnabled true/false 전체 사이클 각 1개
 
 ## 맵
