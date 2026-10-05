@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Tex
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import { MapPin } from 'lucide-react-native';
 import { fonts } from '../../shared/lib/fonts';
 import { getCurrentCoords, type Coords } from '../../shared/lib/deviceLocation';
 import { SvgIcon } from '../../shared/ui/SvgIcon';
@@ -174,10 +175,12 @@ export function ShelterTabScreen() {
 
       <PermissionSheet
         visible={locationDenied}
-        title="위치 접근이 꺼져 있어요"
-        message={'설정에서 위치 접근을 허용하면 가까운 보호소를 거리순으로 볼 수 있어요.\n지금은 지역을 직접 골라도 돼요.'}
-        alternativeLabel="지역 직접 선택"
-        onAlternative={() => {
+        icon={<MapPin size={26} color="#a48db7" strokeWidth={1.7} />}
+        title="위치 없이도 찾을 수 있어요"
+        message={'현재 위치 접근이 꺼져 있어요.\n원하는 지역을 직접 선택해도 괜찮아요.'}
+        footnote="위치 권한은 나중에 허용해도 괜찮아요."
+        primaryLabel="지역 직접 선택"
+        onPrimary={() => {
           setLocationDenied(false);
           setRegionSheetOpen(true);
         }}

@@ -10,17 +10,15 @@ import { useMediaUrl } from '../hooks/useMediaUrl';
 export function PhotoStrip({ photos, max, uploading, onAdd, onRemove }: { photos: ComposePhoto[]; max: number; uploading: boolean; onAdd: () => void; onRemove: (mediaId: string) => void }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-      {photos.length < max && (
-        <Pressable style={styles.add} onPress={onAdd} disabled={uploading}>
-          {uploading ? <ActivityIndicator color="#a58faf" /> : <Camera size={20} color="#a58faf" strokeWidth={1.7} />}
-          <Text style={styles.addText}>
-            {photos.length}/{max}
-          </Text>
-        </Pressable>
-      )}
       {photos.map((photo, index) => (
         <Thumb key={photo.mediaId} photo={photo} cover={index === 0 && max > 1} onRemove={() => onRemove(photo.mediaId)} />
       ))}
+      {photos.length < max && (
+        <Pressable style={styles.add} onPress={onAdd} disabled={uploading}>
+          {uploading ? <ActivityIndicator color="#b2a0be" /> : <Camera size={26} color="#b2a0be" strokeWidth={1.6} />}
+          <Text style={styles.addText}>{uploading ? '올리는 중' : '사진 추가'}</Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }
@@ -30,25 +28,25 @@ function Thumb({ photo, cover, onRemove }: { photo: ComposePhoto; cover: boolean
   const uri = photo.uri ?? remote;
   return (
     <View style={styles.thumb}>
-      <RemoteImage url={uri} width={84} height={84} radius={14} />
+      <RemoteImage url={uri} width={82} height={82} radius={12} />
       {cover && (
         <View style={styles.coverBadge}>
           <Text style={styles.coverText}>대표</Text>
         </View>
       )}
       <Pressable style={styles.remove} onPress={onRemove} hitSlop={8}>
-        <X size={12} color="#ffffff" strokeWidth={2.4} />
+        <X size={11} color="#af9bb6" strokeWidth={2.2} />
       </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { gap: 10, paddingVertical: 4 },
-  add: { width: 84, height: 84, borderRadius: 14, borderWidth: 1, borderStyle: 'dashed', borderColor: '#cdbbdb', backgroundColor: '#f8f3fa', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  addText: { fontFamily: fonts.pixel, fontSize: 10, color: '#a58faf' },
-  thumb: { width: 84, height: 84 },
-  coverBadge: { position: 'absolute', left: 6, bottom: 6, paddingHorizontal: 7, height: 18, borderRadius: 7, backgroundColor: 'rgba(255,254,244,0.92)', justifyContent: 'center' },
-  coverText: { fontFamily: fonts.pixel, fontSize: 8.5, color: '#9679aa' },
-  remove: { position: 'absolute', top: 5, right: 5, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(60,56,70,0.6)', alignItems: 'center', justifyContent: 'center' },
+  row: { gap: 12, paddingTop: 6, paddingRight: 6 },
+  add: { width: 82, height: 82, borderRadius: 12, borderWidth: 1, borderColor: '#d8c9df', backgroundColor: '#f8f4f8', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  addText: { fontFamily: fonts.body, fontSize: 10, color: '#af9bba' },
+  thumb: { width: 82, height: 82 },
+  coverBadge: { position: 'absolute', left: 7, bottom: 7, paddingHorizontal: 7, height: 17, borderRadius: 6, backgroundColor: 'rgba(255,254,244,0.92)', justifyContent: 'center' },
+  coverText: { fontFamily: fonts.body, fontSize: 8.5, color: '#ae8c9d' },
+  remove: { position: 'absolute', top: -5, right: -5, width: 21, height: 21, borderRadius: 10.5, backgroundColor: '#fffef8', borderWidth: 1, borderColor: '#dcceda', alignItems: 'center', justifyContent: 'center' },
 });

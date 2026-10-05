@@ -2,10 +2,10 @@ module.exports = {
   preset: '@react-native/jest-preset',
   setupFiles: [
     'react-native-gesture-handler/jestSetup',
+    '<rootDir>/jest.setup.js',
     '@shopify/react-native-skia/jestSetup.js',
   ],
   moduleNameMapper: {
-    '^react-native-reanimated$': 'react-native-reanimated/mock',
     // The package's "react-native"/"module" exports point at an .mjs build the RN
     // Jest preset's transform regex doesn't match (js|ts|tsx only, no mjs) — point
     // Jest at its prebuilt CJS file instead rather than widening that shared regex.

@@ -6,6 +6,7 @@ import { MessageCircle, MoreHorizontal, Users } from 'lucide-react-native';
 import { fonts } from '../../../shared/lib/fonts';
 import { writeErrorMessage } from '../../../shared/lib/communityErrors';
 import { ActionSheet, SheetButton, SheetOption } from '../../../shared/ui/ActionSheet';
+import { PuppyButton } from '../../../shared/ui/PuppyButton';
 import { deleteCommunityPost, reportCommunityPost, startPostInquiry, updateCommunityPostStatus } from '../api/posts';
 import { REPORT_REASONS, reportError, statusChoices, type PostStatusChoice, type ReportReason } from '../composeForm';
 import type { CommunityPost } from '../types';
@@ -53,8 +54,8 @@ export function PostMenu({ post, onChanged }: { post: CommunityPost; onChanged: 
 
   return (
     <>
-      <Pressable style={styles.more} onPress={() => open('menu')} hitSlop={10}>
-        <MoreHorizontal size={18} color="#7b8d99" strokeWidth={2} />
+      <Pressable style={styles.more} onPress={() => open('menu')} hitSlop={12}>
+        <MoreHorizontal size={20} color="#91a8b5" strokeWidth={2} />
       </Pressable>
 
       <ActionSheet visible={sheet === 'menu'} onClose={() => setSheet(null)}>
@@ -79,15 +80,16 @@ export function PostMenu({ post, onChanged }: { post: CommunityPost; onChanged: 
         <SheetButton label="닫기" onPress={() => setSheet(null)} />
       </ActionSheet>
 
-      <ActionSheet visible={sheet === 'status'} onClose={() => setSheet(null)} title="글 상태 변경" message="상태를 바꾸면 이웃들에게도 바로 보여요.">
+      <ActionSheet visible={sheet === 'status'} onClose={() => setSheet(null)} title="글 상태 변경" message="현재 상황을 알려주면 이웃들에게도 도움이 돼요.">
         {statusChoices(post.category).map(choice => (
-          <SheetOption key={choice.status} title={choice.title} description={choice.description} selected={status === choice.status} onPress={() => setStatus(choice.status)} />
+          <SheetOption key={choice.status} title={choice.title} description={choice.description} selected={status === choice.status} positive={choice.status === 'REUNITED'} onPress={() => setStatus(choice.status)} />
         ))}
         {!!error && <Text style={styles.error}>{error}</Text>}
-        <SheetButton
-          label={busy ? '변경 중…' : '변경하기'}
-          tone="primary"
-          disabled={busy || status === post.status}
+        <PuppyButton
+          label="이 상태로 변경하기"
+          tone="green"
+          busy={busy}
+          disabled={status === post.status}
           onPress={() =>
             run(async () => {
               await updateCommunityPostStatus(post.id, post.version, status);
@@ -96,18 +98,25 @@ export function PostMenu({ post, onChanged }: { post: CommunityPost; onChanged: 
             })
           }
         />
+        <Pressable onPress={() => setSheet(null)} hitSlop={10}>
+          <Text style={styles.later}>나중에 하기</Text>
+        </Pressable>
       </ActionSheet>
 
-      <ActionSheet visible={sheet === 'report'} onClose={() => setSheet(null)} title="이 글을 신고할까요?" message="운영진이 확인한 뒤 조치해요. 신고는 글쓴이에게 알려지지 않아요.">
+      <ActionSheet visible={sheet === 'report'} onClose={() => setSheet(null)} title="게시글 신고" message="어떤 문제가 있는지 알려주세요.">
         {REPORT_REASONS.map(option => (
           <SheetOption key={option.reason} title={option.label} selected={reason === option.reason} onPress={() => setReason(option.reason)} />
         ))}
-        <TextInput style={styles.details} value={details} onChangeText={setDetails} placeholder={reason === 'OTHER' ? '사유를 적어 주세요' : '추가 설명 (선택)'} placeholderTextColor="#b0a2b7" multiline maxLength={1000} textAlignVertical="top" />
+        <View style={styles.detailsHead}>
+          <Text style={styles.detailsLabel}>추가 설명</Text>
+          <Text style={styles.detailsHint}>{reason === 'OTHER' ? '필수' : '선택'}</Text>
+        </View>
+        <TextInput style={styles.details} value={details} onChangeText={setDetails} placeholder="확인에 도움이 될 내용을 적어주세요." placeholderTextColor="#c0adc6" multiline maxLength={1000} textAlignVertical="top" />
         {!!error && <Text style={styles.error}>{error}</Text>}
-        <SheetButton
-          label={busy ? '신고 중…' : '신고하기'}
-          tone="primary"
-          disabled={busy}
+        <Text style={styles.footnote}>신고한 사람의 정보는 글쓴이에게 공개되지 않아요.</Text>
+        <PuppyButton
+          label="신고 보내기"
+          busy={busy}
           onPress={() => {
             const problem = reportError(reason, details);
             if (problem) return setError(problem);
@@ -183,9 +192,14 @@ export function PostBottomActions({ post }: { post: CommunityPost }) {
 }
 
 const styles = StyleSheet.create({
-  more: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#f7fcfc', borderWidth: 0.8, borderColor: '#cce2e7', alignItems: 'center', justifyContent: 'center' },
+  more: { width: 34, height: 34, alignItems: 'flex-end', justifyContent: 'center' },
+  later: { fontFamily: fonts.pixel, fontSize: 11, color: '#ae9ab9', textAlign: 'center', marginTop: 4 },
+  detailsHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 8 },
+  detailsLabel: { fontFamily: fonts.pixel, fontSize: 12, color: '#a58ab1' },
+  detailsHint: { fontFamily: fonts.body, fontSize: 10, color: '#bba9c2' },
+  footnote: { fontFamily: fonts.body, fontSize: 10, color: '#b29cba', textAlign: 'center' },
   error: { fontFamily: fonts.body, fontSize: 12, lineHeight: 17, color: '#c0526b', textAlign: 'center' },
-  details: { height: 84, paddingHorizontal: 14, paddingTop: 12, backgroundColor: '#fffefa', borderWidth: 0.9, borderColor: '#e0d6e6', borderRadius: 13, fontFamily: fonts.body, fontSize: 12.5, color: '#6b6878' },
+  details: { height: 74, paddingHorizontal: 14, paddingTop: 12, backgroundColor: '#fffefa', borderWidth: 1, borderColor: '#dfd1e3', borderRadius: 12, fontFamily: fonts.body, fontSize: 12, color: '#6b6878' },
   bottom: { marginTop: 26, gap: 10 },
   bottomRow: { flexDirection: 'row', gap: 12 },
   bottomButton: { flex: 1, height: 49, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, backgroundColor: '#fffdf8', borderWidth: 1, borderColor: '#ddd2e3', borderRadius: 14 },
