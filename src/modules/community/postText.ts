@@ -1,4 +1,4 @@
-import type { CommentKind, CommunityCategory, CommunityComment } from './types';
+import type { CommentKind, CommunityCategory, CommunityComment, CommunityPost } from './types';
 
 export const CATEGORY_LABEL: Record<CommunityCategory, string> = {
   LOST: '찾고 있어요',
@@ -54,4 +54,20 @@ export function groupComments(comments: CommunityComment[]): CommentThread[] {
 
 export function commentKindLabel(kind: CommentKind): string {
   return kind === 'SIGHTING' ? '목격 제보' : '댓글';
+}
+
+export type PostSort = 'RECENT' | 'ACTIVE';
+export const POST_SORTS: { key: PostSort; label: string }[] = [
+  { key: 'RECENT', label: '최신순' },
+  { key: 'ACTIVE', label: '제보·댓글 많은 순' },
+];
+
+/** The server returns newest first and has no sort parameter, so this re-orders what is loaded;
+ * ties keep the newest-first order. */
+export function sortPosts(posts: CommunityPost[], sort: PostSort): CommunityPost[] {
+  if (sort === 'RECENT') return posts;
+  return posts
+    .map((post, index) => ({ post, index }))
+    .sort((a, b) => b.post.commentCount + b.post.sightingCount - (a.post.commentCount + a.post.sightingCount) || a.index - b.index)
+    .map(entry => entry.post);
 }

@@ -42,3 +42,15 @@ export function withRoParticle(name: string): string {
   const finalConsonant = (last - 0xac00) % 28;
   return finalConsonant === 0 || finalConsonant === 8 ? `${name}로` : `${name}으로`;
 }
+
+export type ShelterSort = 'DEFAULT' | 'NEAREST' | 'NAME';
+export const SHELTER_SORTS: { key: ShelterSort; label: string }[] = [
+  { key: 'DEFAULT', label: '기본 순' },
+  { key: 'NEAREST', label: '가까운 순' },
+  { key: 'NAME', label: '이름 순' },
+];
+
+/** Name order is client-side; 가까운 순 comes from the server when coordinates are sent. */
+export function sortSheltersByName<T extends { name: string }>(shelters: T[]): T[] {
+  return [...shelters].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+}
