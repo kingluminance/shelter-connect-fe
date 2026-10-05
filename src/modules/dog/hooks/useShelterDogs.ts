@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchDogBehavior, fetchShelterDogs } from '../api/shelters';
+import { normalizeBehavior } from '../behaviorSettings';
 import type { DogBehavior, DogSummary } from '../types';
 
 export interface DogWithBehavior extends DogSummary {
@@ -25,7 +26,7 @@ export function useShelterDogs(shelterId: string): ShelterDogsState {
         const withBehavior = await Promise.all(
           summaries.map(async dog => ({
             ...dog,
-            behavior: (await fetchDogBehavior(dog.id)).data,
+            behavior: normalizeBehavior((await fetchDogBehavior(dog.id)).data),
           })),
         );
         if (!cancelled) {

@@ -56,6 +56,17 @@ Skia 캔버스에 렌더 (도트 스프라이트, `core/assets/dog/dogWalkAtlas.
 구현할 때 섞여 들어가서 `reactionDelayMs`를 무시하는 버그가 났고, 테스트로 잡아서 고침
 (`dogStateMachine.test.ts`). LIE_DOWN은 weight 0이면 자연히 재생 안 됨(백엔드 기본값 그대로).
 
+## 사람 인사(PERSON_GREETING) — 강아지별 성격 반영
+백엔드(B-42, `docs/trait-selected-sprites.md`)가 `/behavior`의 `interactions`로 강아지별 레시피를 내려준다.
+- `PERSON_GREETING.enabled`이고 BACK_OFF 비중이 0(조심스럽지 않음)인 강아지는 플레이어가 `triggerDistanceTiles` 안에
+  `reactionDelayMs` 동안 머물면 **걸어가서(WALK) → `arrivalDistanceTiles`에서 멈춰 → TAIL_WAG(`wagDurationMs`) → SNIFF(`sniffDurationMs`)
+  → IDLE**. 플레이어가 거리 밖으로 나가거나 `maxDurationMs`가 넘으면 중단, 끝나면 `cooldownMs` 동안 쉼. 없는 클립 단계는 건너뜀.
+  (`dogStateMachine.ts`의 `tickGreeting`, 테스트 `dogStateMachine.test.ts`)
+- `BALL_CHASE`가 있으면 `settings.ballPlay`보다 우선(`dog/behaviorSettings.ts`의 `normalizeBehavior`, `useShelterDogs`에서 적용).
+- **임시로 걸어 뒀던 로컬 가중치 하한(`withLocalTestWeights`)을 제거** — 이제 서버가 준 값 그대로 움직인다. 그래서 `basis: DEFAULT`인
+  지금의 배포 강아지 4마리는 전부 같은 기본 동작(가만히/걷기/앉기)만 하고, 강아지마다 달라지려면 보호소가 관찰을 CONFIRMED로
+  등록하고 행동 제안을 확인해야 한다(관리자 API `/v1/shelter-admin/dogs/{id}/behavior/*`).
+
 ## 공놀이(공 물어오기)
 구현 완료: `src/modules/game/core/systems/ballPlay.ts` (순수 로직, `movement.ts`의 `stepMovement`·
 `dogStateMachine.ts`의 `TILE_SIZE_MAP_UNITS`/`DOG_RADIUS` 재사용) + `GameScreen.tsx`의 "공 던지기" 탭 버튼

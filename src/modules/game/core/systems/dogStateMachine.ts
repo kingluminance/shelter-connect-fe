@@ -1,6 +1,6 @@
 import { type Bounds, stepMovement } from './movement';
 import { clipDurationMs, forwardFrame } from './spritePlayback';
-import type { DogActionKey, DogAssetManifest, DogBehaviorSettings } from '../../../dog/types';
+import type { DogActionKey, DogAssetManifest, DogBehaviorSettings, PersonGreetingInteraction } from '../../../dog/types';
 
 export type DogState = DogActionKey;
 
@@ -19,6 +19,14 @@ const TARGET_REACHED_DIST = 4;
  * §5 "SIT / LIE_DOWN"). `null` for every other state — those still just use `stateRemainingMs`
  * as a plain countdown the way this file always has. */
 export type DogSubPhase = 'ENTER' | 'HOLD' | 'REVERSE' | null;
+
+/** PERSON_GREETING in progress (docs/trait-selected-sprites.md): walk to the player → TAIL_WAG → SNIFF → IDLE. */
+export interface GreetingState {
+  phase: 'APPROACH' | 'WAG' | 'SNIFF';
+  /** ms since the greeting started — compared with maxDurationMs. */
+  elapsedMs: number;
+  phaseRemainingMs: number;
+}
 
 export interface DogAgent {
   state: DogState;
@@ -45,6 +53,10 @@ export interface DogAgent {
   /** What to enter once an in-progress reverse finishes. A second interrupt while already
    * reversing only changes this, it doesn't restart the reverse animation (spec §5-2). */
   reservedNextState: DogState | null;
+  greeting: GreetingState | null;
+  /** ms the player has lingered inside the greeting trigger distance (reactionDelayMs). */
+  greetingPendingMs: number | null;
+  greetingCooldownUntilMs: number;
 }
 
 export function createDogAgent(x: number, y: number): DogAgent {
@@ -62,6 +74,9 @@ export function createDogAgent(x: number, y: number): DogAgent {
     clipElapsedMs: 0,
     reverseFromFrame: 0,
     reservedNextState: null,
+    greeting: null,
+    greetingPendingMs: null,
+    greetingCooldownUntilMs: 0,
   };
 }
 
@@ -205,6 +220,105 @@ function requestState(
   };
 }
 
+function canPlay(state: DogState, manifest: DogAssetManifest | null): boolean {
+  return manifest === null || (manifest.availableActions.includes(state) && manifest.animations[state] != null);
+}
+
+function setGreetingState(agent: DogAgent, state: DogState): DogAgent {
+  return { ...agent, state, target: null, subPhase: null, stateRemainingMs: 0, clipElapsedMs: 0, reservedNextState: null };
+}
+
+function endGreeting(agent: DogAgent, cfg: PersonGreetingInteraction, settings: DogBehaviorSettings, manifest: DogAssetManifest | null, bounds: Bounds, rng: () => number): DogAgent {
+  const idle = enterState({ ...agent, greeting: null, greetingPendingMs: null }, 'IDLE', settings, manifest, bounds, rng);
+  return { ...idle, greetingCooldownUntilMs: agent.clockMs + cfg.cooldownMs };
+}
+
+/**
+ * PERSON_GREETING (docs/trait-selected-sprites.md): a friendly dog (enabled, and no BACK_OFF weight —
+ * "BACK_OFF가 있는 조심스러운 설정에서는 먼저 접근하지 않는다") that the player lingers near within
+ * triggerDistanceTiles walks over, stops at arrivalDistanceTiles, wags, sniffs, then idles. It aborts if the
+ * player leaves the trigger distance or maxDurationMs passes, and rests for cooldownMs afterwards. Steps whose
+ * clip the dog doesn't have are skipped (never invent a sheet). Returns null when the greeting isn't
+ * involved this tick, so the normal wandering/reaction logic runs.
+ */
+function tickGreeting(
+  agent: DogAgent,
+  cfg: PersonGreetingInteraction,
+  settings: DogBehaviorSettings,
+  player: { x: number; y: number },
+  dt: number,
+  bounds: Bounds,
+  obstacles: Parameters<typeof stepMovement>[0]['obstacles'],
+  rng: () => number,
+  manifest: DogAssetManifest | null,
+): DogAgent | null {
+  const dtMs = dt * 1000;
+  const dist = distance(agent.x, agent.y, player.x, player.y);
+  const triggerPx = cfg.triggerDistanceTiles * TILE_SIZE_MAP_UNITS;
+  const arrivalPx = cfg.arrivalDistanceTiles * TILE_SIZE_MAP_UNITS;
+
+  if (agent.greeting) {
+    const elapsed = agent.greeting.elapsedMs + dtMs;
+    if (dist > triggerPx || elapsed > cfg.maxDurationMs) {
+      return endGreeting(agent, cfg, settings, manifest, bounds, rng);
+    }
+    let current: DogAgent = { ...agent, greeting: { ...agent.greeting, elapsedMs: elapsed } };
+    const greeting = current.greeting as GreetingState;
+
+    if (greeting.phase === 'APPROACH') {
+      if (dist <= arrivalPx) {
+        current = canPlay('TAIL_WAG', manifest)
+          ? { ...setGreetingState(current, 'TAIL_WAG'), greeting: { ...greeting, phase: 'WAG', phaseRemainingMs: cfg.wagDurationMs } }
+          : { ...setGreetingState(current, 'SNIFF'), greeting: { ...greeting, phase: 'SNIFF', phaseRemainingMs: cfg.sniffDurationMs } };
+      } else {
+        const moved = stepMovement({
+          x: current.x,
+          y: current.y,
+          dx: player.x - current.x,
+          dy: player.y - current.y,
+          speed: settings.actions.WALK.speedTilesPerSecond * TILE_SIZE_MAP_UNITS,
+          dt,
+          radius: DOG_RADIUS,
+          bounds,
+          obstacles,
+        });
+        current = { ...current, state: 'WALK', target: { x: player.x, y: player.y }, x: moved.x, y: moved.y };
+      }
+      return current;
+    }
+
+    const remaining = greeting.phaseRemainingMs - dtMs;
+    if (remaining > 0) {
+      return { ...current, greeting: { ...greeting, phaseRemainingMs: remaining } };
+    }
+    if (greeting.phase === 'WAG' && canPlay('SNIFF', manifest)) {
+      return { ...setGreetingState(current, 'SNIFF'), greeting: { ...greeting, phase: 'SNIFF', phaseRemainingMs: cfg.sniffDurationMs } };
+    }
+    return endGreeting(current, cfg, settings, manifest, bounds, rng);
+  }
+
+  // Not greeting yet — may the player's presence start one?
+  const friendly = cfg.enabled && settings.actions.BACK_OFF.weight <= 0;
+  const ready =
+    friendly &&
+    agent.subPhase === null &&
+    agent.state !== 'TAIL_WAG' &&
+    agent.state !== 'BACK_OFF' &&
+    agent.greetingCooldownUntilMs <= agent.clockMs &&
+    dist < triggerPx &&
+    canPlay('WALK', manifest) &&
+    settings.actions.WALK.speedTilesPerSecond > 0;
+  if (!ready) {
+    return agent.greetingPendingMs === null ? null : { ...agent, greetingPendingMs: null };
+  }
+  const pending = (agent.greetingPendingMs ?? cfg.reactionDelayMs) - dtMs;
+  if (pending > 0) {
+    return { ...agent, greetingPendingMs: pending };
+  }
+  const started: DogAgent = { ...agent, greetingPendingMs: null, greeting: { phase: 'APPROACH', elapsedMs: 0, phaseRemainingMs: 0 } };
+  return { ...setGreetingState(started, 'WALK'), greeting: started.greeting };
+}
+
 /**
  * Advances one dog by dt seconds using the shelter-configured behavior settings
  * (docs/dog-behavior-api.md): weighted random action selection bounded by each
@@ -228,6 +342,7 @@ export function tickDog(
   obstacles: Parameters<typeof stepMovement>[0]['obstacles'],
   rng: () => number = Math.random,
   manifest: DogAssetManifest | null = null,
+  greeting: PersonGreetingInteraction | null = null,
 ): DogAgent {
   const dtMs = dt * 1000;
   // Unconditional (like clockMs) rather than only while re-deciding: the render layer
@@ -235,6 +350,17 @@ export function tickDog(
   // while reactively active, etc), not just SIT/LIE_DOWN's own sub-machine below.
   // enterState()/requestState() reset this to 0 on every transition.
   let next: DogAgent = { ...agent, clockMs: agent.clockMs + dtMs, clipElapsedMs: agent.clipElapsedMs + dtMs };
+
+  // --- PERSON_GREETING (B-42 interaction recipe) takes over the dog while it is greeting ---
+  if (greeting) {
+    const handled = tickGreeting(next, greeting, settings, player, dt, bounds, obstacles, rng, manifest);
+    if (handled) {
+      if (handled.greeting) {
+        return handled;
+      }
+      next = handled;
+    }
+  }
 
   // --- Player-proximity reaction (only if the shelter enabled it with weight > 0) ---
   const dist = distance(next.x, next.y, player.x, player.y);

@@ -21,7 +21,7 @@ import {
 } from './core/assets/character/playerWalk';
 import { DOG_IDENTITY_COUNT } from './core/assets/dog/dogWalkAtlas';
 // TEMPORARY, Phase 1 verification only — see localManifest.ts's own header comment.
-import { localDogAssetManifest, withLocalTestWeights } from './core/assets/dog/real-v1/localManifest';
+import { localDogAssetManifest } from './core/assets/dog/real-v1/localManifest';
 import { usePropImages } from './core/assets/usePropImages';
 import { DogSprite } from './core/entities/DogSprite';
 import { SpriteFrame } from './core/entities/SpriteFrame';
@@ -275,19 +275,20 @@ export function GameScreen() {
             ballStatesRef.current[i] = result.state;
             return { ...agent, x: result.dogPos.x, y: result.dogPos.y };
           }
-          // TEMPORARY, Phase 1 verification only: every dog uses the same local real-v1
-          // manifest regardless of its real avatarKey/id, and a weight/range floor so
-          // SIT/LIE_DOWN/BACK_OFF/TAIL_WAG are actually reachable on the real (all
-          // basis:DEFAULT) dev-server dogs — see localManifest.ts's header.
+          // TEMPORARY, Phase 1: every dog uses the same local real-v1 manifest regardless of its
+          // real avatarKey/id (see localManifest.ts's header). The behavior values themselves are
+          // the backend's, as served — no local weight overrides — so each dog moves by its own
+          // settings and PERSON_GREETING recipe (docs/trait-selected-sprites.md).
           return tickDog(
             agent,
-            withLocalTestWeights(settings),
+            settings,
             dt,
             playerPosRef.current,
             mapLayout.bounds,
             mapLayout.obstacles,
             Math.random,
             localDogAssetManifest,
+            dogMeta[i].behavior.interactions?.PERSON_GREETING ?? null,
           );
         });
         // Actual displacement, not a target point — a dog blocked by an obstacle isn't
