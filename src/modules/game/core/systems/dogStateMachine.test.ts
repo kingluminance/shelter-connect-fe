@@ -1,5 +1,5 @@
 import { createDogAgent, tickDog } from './dogStateMachine';
-import type { DogAssetManifest, DogBehaviorSettings } from '../../../dog/types';
+import type { DogAssetManifest, DogBehaviorSettings, PersonGreetingInteraction } from '../../../dog/types';
 
 const bounds = { left: 0, top: 0, right: 200, bottom: 200 };
 const noObstacles: { x: number; y: number; w: number; h: number }[] = [];
@@ -287,4 +287,67 @@ test('a reaction request mid-SIT reverses out first, then enters the reserved re
     agent = tickDog(agent, settings, 0.05, closePlayer, bounds, noObstacles, Math.random, manifest);
   }
   expect(agent.state).toBe('BACK_OFF');
+});
+
+describe('PERSON_GREETING', () => {
+  const greeting: PersonGreetingInteraction = {
+    enabled: true,
+    triggerDistanceTiles: 5,
+    arrivalDistanceTiles: 1,
+    reactionDelayMs: 200,
+    wagDurationMs: 1000,
+    sniffDurationMs: 600,
+    maxDurationMs: 10000,
+    cooldownMs: 5000,
+  };
+  const settings = makeSettings({ actions: { ...makeSettings().actions, WALK: { ...makeSettings().actions.WALK, speedTilesPerSecond: 2, weight: 0 }, IDLE: { ...makeSettings().actions.IDLE, weight: 100 } } });
+  const player = { x: 150, y: 100 }; // 50px = ~2 tiles from the dog at (100,100)
+
+  function run(agent: ReturnType<typeof createDogAgent>, ms: number, step = 50, who = player, cfg: PersonGreetingInteraction | null = greeting, s: DogBehaviorSettings = settings) {
+    let current = agent;
+    const seen: string[] = [];
+    for (let t = 0; t < ms; t += step) {
+      current = tickDog(current, s, step / 1000, who, bounds, noObstacles, () => 0.5, null, cfg);
+      if (seen[seen.length - 1] !== current.state) seen.push(current.state);
+    }
+    return { current, seen };
+  }
+
+  test('walks to the player, wags, sniffs, then idles and rests', () => {
+    const { current, seen } = run(createDogAgent(100, 100), 6000);
+    expect(seen).toEqual(expect.arrayContaining(['WALK', 'TAIL_WAG', 'SNIFF']));
+    expect(seen.indexOf('WALK')).toBeLessThan(seen.indexOf('TAIL_WAG'));
+    expect(seen.indexOf('TAIL_WAG')).toBeLessThan(seen.indexOf('SNIFF'));
+    expect(current.greeting).toBeNull();
+    expect(current.greetingCooldownUntilMs).toBeGreaterThan(0);
+  });
+
+  test('gives up when the player leaves the trigger distance', () => {
+    let { current } = run(createDogAgent(100, 100), 400);
+    expect(current.greeting).not.toBeNull();
+    ({ current } = run(current, 200, 50, { x: 190, y: 190 }));
+    expect(current.greeting).toBeNull();
+    expect(current.state).toBe('IDLE');
+  });
+
+  test('a dog that also backs off never approaches first', () => {
+    const cautious = makeSettings({ actions: { ...settings.actions, BACK_OFF: { ...settings.actions.BACK_OFF, weight: 20 } } });
+    const { current, seen } = run(createDogAgent(100, 100), 3000, 50, player, greeting, cautious);
+    expect(current.greeting).toBeNull();
+    expect(seen).not.toContain('TAIL_WAG');
+  });
+
+  test('disabled interaction does nothing', () => {
+    const { current } = run(createDogAgent(100, 100), 3000, 50, player, { ...greeting, enabled: false });
+    expect(current.greeting).toBeNull();
+    expect(current.state).not.toBe('TAIL_WAG');
+  });
+
+  test('stays put (no greeting) when the manifest has no WALK clip', () => {
+    let current = createDogAgent(100, 100);
+    for (let t = 0; t < 2000; t += 50) {
+      current = tickDog(current, settings, 0.05, player, bounds, noObstacles, () => 0.5, makeManifest(), greeting);
+    }
+    expect(current.greeting).toBeNull();
+  });
 });

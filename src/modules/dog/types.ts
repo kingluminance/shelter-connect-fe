@@ -82,12 +82,37 @@ export interface DogBehaviorSettings {
   ballPlay: { chaseEnabled: boolean; returnEnabled: boolean; reactionDelayMs: number };
 }
 
+// docs/trait-selected-sprites.md (B-42) "프론트 연결 계약" — GET /v1/dogs/{id}/behavior's `interactions`.
+export interface PersonGreetingInteraction {
+  enabled: boolean;
+  triggerDistanceTiles: number;
+  arrivalDistanceTiles: number;
+  reactionDelayMs: number;
+  wagDurationMs: number;
+  sniffDurationMs: number;
+  maxDurationMs: number;
+  cooldownMs: number;
+}
+
+export interface BallChaseInteraction {
+  enabled: boolean;
+  returnEnabled: boolean;
+  reactionDelayMs: number;
+}
+
+export interface DogInteractions {
+  PERSON_GREETING?: PersonGreetingInteraction;
+  BALL_CHASE?: BallChaseInteraction;
+}
+
 export interface DogBehavior {
   dogId: string;
   schemaVersion: number;
   basis: 'CONFIRMED' | 'DEFAULT';
   revision: number | null;
   settings: DogBehaviorSettings;
+  /** Present once the backend sends the B-42 interaction recipes; older responses omit it. */
+  interactions?: DogInteractions;
 }
 
 // docs/dog-action-playback-spec.md (v2) — GET /v1/dogs/{dogId}/assets.

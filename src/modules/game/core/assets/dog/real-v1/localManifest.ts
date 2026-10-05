@@ -4,7 +4,7 @@
 // device with real (if not per-dog) art before the /v1/dogs/{dogId}/assets network call
 // exists. Delete this file (and its one usage in GameScreen.tsx) once Phase 2 lands.
 import { Image } from 'react-native';
-import type { DogActionKey, DogAssetClip, DogAssetManifest, DogBehaviorSettings } from '../../../../../dog/types';
+import type { DogActionKey, DogAssetClip, DogAssetManifest } from '../../../../../dog/types';
 import rawManifest from './manifest.json';
 
 const animationsById = rawManifest.animations as Record<string, any>;
@@ -77,27 +77,3 @@ export const localDogAssetManifest: DogAssetManifest = {
     },
   },
 };
-
-/**
- * TEMPORARY, Phase 1 only (same lifecycle as localDogAssetManifest above) — the real
- * dev-server dogs are all `basis:DEFAULT`, whose weights/ranges keep SIT/LIE_DOWN/
- * BACK_OFF/TAIL_WAG rare or unreachable (e.g. personalSpaceTiles too small to ever
- * trigger a reaction). Floors those specific fields just enough to actually SEE all 8
- * actions play out on-device; every other field (speeds, other actions' weights, ball
- * play) passes through untouched.
- */
-export function withLocalTestWeights(settings: DogBehaviorSettings): DogBehaviorSettings {
-  return {
-    ...settings,
-    approachDistanceTiles: Math.max(settings.approachDistanceTiles, 4),
-    personalSpaceTiles: Math.max(settings.personalSpaceTiles, 1.5),
-    reactionDelayMs: Math.min(settings.reactionDelayMs || 500, 500),
-    actions: {
-      ...settings.actions,
-      SIT: { ...settings.actions.SIT, weight: Math.max(settings.actions.SIT.weight, 40), cooldownMs: Math.min(settings.actions.SIT.cooldownMs, 3000) },
-      LIE_DOWN: { ...settings.actions.LIE_DOWN, weight: Math.max(settings.actions.LIE_DOWN.weight, 40), cooldownMs: Math.min(settings.actions.LIE_DOWN.cooldownMs, 3000) },
-      BACK_OFF: { ...settings.actions.BACK_OFF, weight: Math.max(settings.actions.BACK_OFF.weight, 10), cooldownMs: Math.min(settings.actions.BACK_OFF.cooldownMs, 3000) },
-      TAIL_WAG: { ...settings.actions.TAIL_WAG, weight: Math.max(settings.actions.TAIL_WAG.weight, 10), cooldownMs: Math.min(settings.actions.TAIL_WAG.cooldownMs, 3000) },
-    },
-  };
-}

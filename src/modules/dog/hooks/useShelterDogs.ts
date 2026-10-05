@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { fetchDogBehavior, fetchShelterDogs } from '../api/shelters';
+import { normalizeBehavior } from '../behaviorSettings';
 import type { DogBehavior, DogSummary } from '../types';
+
+/** Demo: unconfirmed dogs fetch the ball too (see normalizeBehavior). */
+const DEMO_BALL_PLAY = true;
 
 export interface DogWithBehavior extends DogSummary {
   behavior: DogBehavior;
@@ -25,7 +29,7 @@ export function useShelterDogs(shelterId: string): ShelterDogsState {
         const withBehavior = await Promise.all(
           summaries.map(async dog => ({
             ...dog,
-            behavior: (await fetchDogBehavior(dog.id)).data,
+            behavior: normalizeBehavior((await fetchDogBehavior(dog.id)).data, { demoBallPlay: DEMO_BALL_PLAY }),
           })),
         );
         if (!cancelled) {
