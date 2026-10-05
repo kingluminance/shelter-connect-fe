@@ -64,7 +64,7 @@ function App() {
             <Stack.Screen name="CommunityLocations" component={CommunityLocationsScreen} options={{ headerShown: false }} />
             <Stack.Screen name="CommunityCompose" component={CommunityComposeScreen} options={{ headerShown: false }} />
             <Stack.Screen name="SightingCompose" component={SightingComposeScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: '소개서' }} />
+            <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
           </Stack.Navigator>
         </NavigationContainer>
       </SafeAreaProvider>

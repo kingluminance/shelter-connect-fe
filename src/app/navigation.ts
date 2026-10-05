@@ -31,6 +31,7 @@ export type RootStackParamList = {
     dogId: string;
     dogName: string;
     identityIndex: number;
+    shelterName: string;
     knownFacts: string[];
     pendingQuestions: string[];
   };
