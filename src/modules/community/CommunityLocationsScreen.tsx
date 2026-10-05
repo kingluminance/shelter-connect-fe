@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -9,6 +9,7 @@ import { copyAddress, openInMaps } from '../../shared/lib/mapLinks';
 import { ConnectionErrorView } from '../../shared/ui/ConnectionErrorView';
 import { useCommunityComments, useCommunityPost } from './hooks/useCommunityPost';
 import { PostMini } from './components/PostMini';
+import { SpotMap, type MapSpot } from './components/SpotMap';
 import { ScreenFrame } from './components/ScreenFrame';
 import type { CommunityPostLocation } from './types';
 import type { RootStackParamList } from '../../app/navigation';
@@ -25,8 +26,9 @@ function whenLabel(iso: string): string {
   return `${day} ${formatClock(iso)}`;
 }
 
-// Figma "12 목격 위치" (pencil A5iSP7) without the map — the in-app map is out of scope for now,
-// so each place is a card with 주소 복사 / 지도 앱으로 보기 (the design's own bottom actions).
+// Figma "12 목격 위치" (pencil A5iSP7): Naver map with pins + the selected place's card with
+// 주소 복사 / 지도 앱으로 보기. Places saved without coordinates (optional in the API) can't be pinned,
+// so they stay as plain cards below the map.
 export function CommunityLocationsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { params } = useRoute<RouteProp<RootStackParamList, 'CommunityLocations'>>();
@@ -58,6 +60,26 @@ export function CommunityLocationsScreen() {
     return list;
   }, [postState, sightings]);
 
+  const pinned = useMemo(() => spots.filter(spot => spot.location.latitude !== null && spot.location.longitude !== null), [spots]);
+  const unpinned = useMemo(() => spots.filter(spot => !pinned.includes(spot)), [spots, pinned]);
+  const mapSpots = useMemo<MapSpot[]>(
+    () =>
+      pinned.map(spot => ({
+        key: spot.key,
+        kind: spot.key === 'post' ? 'post' : 'sighting',
+        title: spot.key === 'post' ? spot.title : '목격 제보 위치',
+        latitude: spot.location.latitude as number,
+        longitude: spot.location.longitude as number,
+      })),
+    [pinned],
+  );
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // Start on the newest sighting (the design's selected pin), else the post's own place.
+  useEffect(() => {
+    if (selectedKey === null && pinned.length > 0) setSelectedKey(pinned[pinned.length - 1].key);
+  }, [pinned, selectedKey]);
+  const selected = pinned.find(spot => spot.key === selectedKey) ?? null;
+
   return (
     <ScreenFrame title="목격 위치">
       {postState.status === 'loading' && <ActivityIndicator style={styles.gap} />}
@@ -67,37 +89,10 @@ export function CommunityLocationsScreen() {
           <PostMini post={postState.post} onPress={() => navigation.goBack()} />
           <Text style={styles.lead}>남겨준 단서를 함께 살펴봐요.</Text>
           {spots.length === 0 && <Text style={styles.empty}>아직 남겨진 위치가 없어요.</Text>}
-          {spots.map(spot => (
-            <View key={spot.key} style={styles.card}>
-              <View style={styles.cardHead}>
-                <View style={styles.pin}>
-                  <MapPin size={15} color="#aa90b7" strokeWidth={1.8} />
-                </View>
-                <View style={styles.cardCopy}>
-                  <View style={styles.kind}>
-                    <Text style={styles.kindText}>{spot.title}</Text>
-                  </View>
-                  <Text style={styles.place}>{spot.location.label}</Text>
-                  <Text style={styles.caption}>{spot.caption}</Text>
-                </View>
-              </View>
-              <View style={styles.divider} />
-              <View style={styles.actions}>
-                <Pressable
-                  style={styles.action}
-                  onPress={() => {
-                    copyAddress(spot.location.label);
-                    Alert.alert('복사했어요', spot.location.label);
-                  }}
-                >
-                  <Text style={styles.actionText}>주소 복사</Text>
-                </Pressable>
-                <Pressable style={styles.action} onPress={() => openInMaps(spot.location).catch(() => Alert.alert('지도 앱을 열 수 없어요'))}>
-                  <Text style={[styles.actionText, styles.actionPrimary]}>지도 앱으로 보기</Text>
-                  <ChevronRight size={13} color="#9e86ad" strokeWidth={2} />
-                </Pressable>
-              </View>
-            </View>
+          {mapSpots.length > 0 && <SpotMap spots={mapSpots} selectedKey={selectedKey} onSelect={setSelectedKey} />}
+          {selected && <SpotCard spot={selected} style={styles.selectedCard} />}
+          {unpinned.map(spot => (
+            <SpotCard key={spot.key} spot={spot} />
           ))}
         </>
       )}
@@ -105,7 +100,43 @@ export function CommunityLocationsScreen() {
   );
 }
 
+function SpotCard({ spot, style }: { spot: Spot; style?: object }) {
+  return (
+    <View style={[styles.card, style]}>
+      <View style={styles.cardHead}>
+        <View style={styles.pin}>
+          <MapPin size={15} color="#aa90b7" strokeWidth={1.8} />
+        </View>
+        <View style={styles.cardCopy}>
+          <View style={styles.kind}>
+            <Text style={styles.kindText}>{spot.title}</Text>
+          </View>
+          <Text style={styles.place}>{spot.location.label}</Text>
+          <Text style={styles.caption}>{spot.caption}</Text>
+        </View>
+      </View>
+      <View style={styles.divider} />
+      <View style={styles.actions}>
+        <Pressable
+          style={styles.action}
+          onPress={() => {
+            copyAddress(spot.location.label);
+            Alert.alert('복사했어요', spot.location.label);
+          }}
+        >
+          <Text style={styles.actionText}>주소 복사</Text>
+        </Pressable>
+        <Pressable style={styles.action} onPress={() => openInMaps(spot.location).catch(() => Alert.alert('지도 앱을 열 수 없어요'))}>
+          <Text style={[styles.actionText, styles.actionPrimary]}>지도 앱으로 보기</Text>
+          <ChevronRight size={13} color="#9e86ad" strokeWidth={2} />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  selectedCard: { marginTop: 16 },
   gap: { marginTop: 24 },
   lead: { fontFamily: fonts.pixel, fontSize: 14, lineHeight: 20, color: '#9780a5', marginTop: 20, marginBottom: 16, marginLeft: 1 },
   empty: { fontFamily: fonts.body, fontSize: 12, color: '#a1998e', textAlign: 'center', marginTop: 24 },

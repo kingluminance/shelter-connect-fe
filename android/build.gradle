@@ -18,4 +18,11 @@ buildscript {
     }
 }
 
+// 네이버 지도 SDK (react-native-naver-map)
+allprojects {
+    repositories {
+        maven { url "https://repository.map.naver.com/archive/maven" }
+    }
+}
+
 apply plugin: "com.facebook.react.rootproject"
