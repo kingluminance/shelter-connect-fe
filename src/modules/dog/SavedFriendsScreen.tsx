@@ -9,6 +9,8 @@ import { SpriteFrame } from '../game/core/entities/SpriteFrame';
 import { DOG_FRAME_SIZE, dogIdleRow, dogWalkAtlas } from '../game/core/assets/dog/dogWalkAtlas';
 import { fonts } from '../../shared/lib/fonts';
 import { SvgIcon } from '../../shared/ui/SvgIcon';
+import { SortButton } from '../../shared/ui/SortButton';
+import { SAVED_SORTS, sortSavedDogs, type SavedSort } from './savedSort';
 import { ConnectionErrorView } from '../../shared/ui/ConnectionErrorView';
 import { svgAssets } from './assets/svgAssets';
 import { fetchDog } from './api/shelters';
@@ -29,17 +31,19 @@ export function SavedFriendsScreen() {
   const { state, removeLocally, reload } = useSavedDogsList(50);
   const [search, setSearch] = useState('');
   const [chattedOnly, setChattedOnly] = useState(false);
+  const [sort, setSort] = useState<SavedSort>('RECENT');
 
   const dogs = useMemo(() => (state.status === 'ready' ? state.dogs : []), [state]);
   const chattedCount = dogs.filter(d => d.sessionId !== null).length;
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    return dogs.filter(
+    const filtered = dogs.filter(
       d =>
         (!chattedOnly || d.sessionId !== null) &&
         (!needle || d.dogName.toLowerCase().includes(needle) || d.shelterName.toLowerCase().includes(needle)),
     );
-  }, [dogs, search, chattedOnly]);
+    return sortSavedDogs(filtered, sort);
+  }, [dogs, search, chattedOnly, sort]);
 
   const unsave = async (dog: SavedDog) => {
     removeLocally(dog.dogId);
@@ -100,8 +104,7 @@ export function SavedFriendsScreen() {
             </View>
           </Pressable>
           <View style={styles.sortLabel}>
-            <Text style={styles.sortText}>최근 저장순</Text>
-            <SvgIcon xml={svgAssets.sort} width={7} height={5} />
+            <SortButton options={SAVED_SORTS} value={sort} onChange={setSort} />
           </View>
         </View>
 
@@ -313,7 +316,6 @@ const styles = StyleSheet.create({
   chipCount: { width: 17, height: 17, borderRadius: 8, backgroundColor: '#f0eaf3', alignItems: 'center', justifyContent: 'center' },
   chipCountText: { fontFamily: fonts.pixel, fontSize: 9, lineHeight: 13, color: '#a591b0' },
   sortLabel: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 12 },
-  sortText: { fontFamily: fonts.body, fontSize: 10.5, lineHeight: 15, color: '#9c98a2' },
   gap: { marginTop: 16 },
   hintText: { fontFamily: fonts.body, fontSize: 12, color: '#a1998e', textAlign: 'center' },
   card: {
