@@ -13,7 +13,8 @@ import { svgAssets } from './assets/svgAssets';
 import { ShelterHouse } from './components/ShelterHouse';
 import { useCurrentShelter } from './hooks/useCurrentShelter';
 import { useShelterDiscovery } from './hooks/useShelterDiscovery';
-import { formatDistanceKm, houseKindFor, withRoParticle } from './shelterDisplay';
+import { SortButton } from '../../shared/ui/SortButton';
+import { formatDistanceKm, houseKindFor, SHELTER_SORTS, sortSheltersByName, withRoParticle, type ShelterSort } from './shelterDisplay';
 import type { HomeTabScreenNavigationProp } from '../../app/navigation';
 import type { ShelterDiscoveryItem } from './types';
 
@@ -30,6 +31,7 @@ export function ShelterTabScreen() {
   const [search, setSearch] = useState('');
   const [region, setRegion] = useState<string | null>(null);
   const [coords, setCoords] = useState<Coords | null>(null);
+  const [nameSort, setNameSort] = useState(false);
   const [locating, setLocating] = useState(false);
   const [regionSheetOpen, setRegionSheetOpen] = useState(false);
   const [locationDenied, setLocationDenied] = useState(false);
@@ -44,7 +46,19 @@ export function ShelterTabScreen() {
     }
   }, [state, search, region]);
 
-  const shelters = useMemo(() => (state.status === 'ready' ? state.shelters : []), [state]);
+  const shelters = useMemo(() => {
+    if (state.status !== 'ready') return [];
+    return nameSort && !coords ? sortSheltersByName(state.shelters) : state.shelters;
+  }, [state, nameSort, coords]);
+  const sort: ShelterSort = coords ? 'NEAREST' : nameSort ? 'NAME' : 'DEFAULT';
+  const changeSort = (next: ShelterSort) => {
+    if (next === 'NEAREST') {
+      locate();
+      return;
+    }
+    setCoords(null);
+    setNameSort(next === 'NAME');
+  };
   const selected = shelters.find(s => s.id === selectedId) ?? null;
   const nearestId = coords && shelters.length > 0 ? shelters[0].id : null;
 
@@ -52,6 +66,7 @@ export function ShelterTabScreen() {
     setLocating(true);
     try {
       setCoords(await getCurrentCoords());
+      setNameSort(false);
       setRegion(null);
     } catch (failure) {
       if (failure === 'DENIED') {
@@ -126,8 +141,7 @@ export function ShelterTabScreen() {
             <Text style={styles.countBadgeText}>{shelters.length}</Text>
           </View>
           <View style={styles.sortLabel}>
-            <SvgIcon xml={svgAssets.target11} width={11} height={11} />
-            <Text style={styles.sortText}>{coords ? '가까운 순' : '기본 순'}</Text>
+            <SortButton options={SHELTER_SORTS} value={sort} onChange={changeSort} size={10} leading={<SvgIcon xml={svgAssets.target11} width={11} height={11} />} />
           </View>
         </View>
 

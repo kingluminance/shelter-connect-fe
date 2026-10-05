@@ -1,4 +1,4 @@
-import { formatDistanceKm, houseKindFor, withRoParticle } from './shelterDisplay';
+import { formatDistanceKm, houseKindFor, sortSheltersByName, withRoParticle } from './shelterDisplay';
 
 describe('houseKindFor', () => {
   test('maps the known map keys', () => {
@@ -31,5 +31,13 @@ describe('withRoParticle', () => {
 
   test('other batchim takes 으로', () => {
     expect(withRoParticle('온기집')).toBe('온기집으로');
+  });
+});
+
+describe('sortSheltersByName', () => {
+  it('sorts Korean names ascending without mutating', () => {
+    const list = [{ name: '해뜨는 보호소' }, { name: '달빛 보호소' }];
+    expect(sortSheltersByName(list).map(s => s.name)).toEqual(['달빛 보호소', '해뜨는 보호소']);
+    expect(list[0].name).toBe('해뜨는 보호소');
   });
 });

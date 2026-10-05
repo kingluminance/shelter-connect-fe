@@ -10,7 +10,9 @@ import { fonts } from '../../shared/lib/fonts';
 import { formatRoomTime } from '../../shared/lib/chatTime';
 import { ConnectionErrorView } from '../../shared/ui/ConnectionErrorView';
 import { RemoteImage } from '../../shared/ui/RemoteImage';
+import { SortButton } from '../../shared/ui/SortButton';
 import { FilterRow, SearchBox } from './ListControls';
+import { ROOM_SORTS, sortRooms, type RoomSort } from './listSort';
 import type { HomeTabScreenNavigationProp } from '../../app/navigation';
 
 const AVATAR_COLORS = ['#eee6d7', '#e7eedc', '#ebe4f0'];
@@ -27,6 +29,7 @@ export function InquiryRoomsList({ onUnreadCount }: { onUnreadCount: (count: num
   const navigation = useNavigation<HomeTabScreenNavigationProp>();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [sort, setSort] = useState<RoomSort>('RECENT');
   const { state, reload } = useInquiryRooms({ q: search, unreadOnly: filter === 'unread' });
 
   const unreadRoomCount = state.status === 'ready' ? state.unreadRoomCount : null;
@@ -49,7 +52,7 @@ export function InquiryRoomsList({ onUnreadCount }: { onUnreadCount: (count: num
     );
   }
 
-  const rooms = state.status === 'ready' ? state.rooms : [];
+  const rooms = state.status === 'ready' ? sortRooms(state.rooms, sort) : [];
   const unreadRooms = state.status === 'ready' ? state.unreadRoomCount : 0;
 
   return (
@@ -62,7 +65,7 @@ export function InquiryRoomsList({ onUnreadCount }: { onUnreadCount: (count: num
         ]}
         selected={filter}
         onSelect={key => setFilter(key as 'all' | 'unread')}
-        sortLabel="최근 대화순"
+        sort={<SortButton options={ROOM_SORTS} value={sort} onChange={setSort} />}
       />
 
       {state.status === 'loading' && <ActivityIndicator style={styles.gap} />}

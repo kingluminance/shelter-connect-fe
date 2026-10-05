@@ -1,5 +1,5 @@
-import { describeApproxTime, describeOccurredAt, groupComments, shortRegion } from './postText';
-import type { CommunityComment } from './types';
+import { describeApproxTime, describeOccurredAt, groupComments, shortRegion, sortPosts } from './postText';
+import type { CommunityComment, CommunityPost } from './types';
 
 const comment = (id: string, parentId: string | null = null, kind: 'COMMENT' | 'SIGHTING' = 'COMMENT'): CommunityComment => ({
   id,
@@ -46,5 +46,14 @@ describe('describeApproxTime', () => {
   test('adds the hour to the day phrase', () => {
     expect(describeApproxTime(new Date(2026, 9, 1, 17, 10).toISOString(), now)).toBe('어제 오후 5시쯤');
     expect(describeApproxTime(new Date(2026, 8, 28, 9, 0).toISOString(), now)).toBe('9월 28일 오전 9시쯤');
+  });
+});
+
+describe('sortPosts', () => {
+  const post = (id: string, commentCount: number, sightingCount: number) => ({ id, commentCount, sightingCount }) as CommunityPost;
+  it('ACTIVE orders by 제보+댓글, ties keep newest-first', () => {
+    const posts = [post('a', 0, 0), post('b', 1, 2), post('c', 3, 0), post('d', 0, 0)];
+    expect(sortPosts(posts, 'ACTIVE').map(p => p.id)).toEqual(['b', 'c', 'a', 'd']);
+    expect(sortPosts(posts, 'RECENT')).toBe(posts);
   });
 });

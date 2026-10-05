@@ -1,8 +1,7 @@
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Search } from 'lucide-react-native';
 import { fonts } from '../../shared/lib/fonts';
-import { SvgIcon } from '../../shared/ui/SvgIcon';
-import { svgAssets as dogSvgAssets } from '../dog/assets/svgAssets';
 
 // Search box + filter chips + sort label shared by both 대화 tab lists (Figma 04).
 export function SearchBox({ value, onChangeText, placeholder }: { value: string; onChangeText: (v: string) => void; placeholder: string }) {
@@ -28,7 +27,7 @@ export interface FilterOption {
   count?: number;
 }
 
-export function FilterRow({ options, selected, onSelect, sortLabel }: { options: FilterOption[]; selected: string; onSelect: (key: string) => void; sortLabel: string }) {
+export function FilterRow({ options, selected, onSelect, sort }: { options: FilterOption[]; selected: string; onSelect: (key: string) => void; sort: ReactNode }) {
   return (
     <View style={styles.filterRow}>
       {options.map(option => {
@@ -44,10 +43,7 @@ export function FilterRow({ options, selected, onSelect, sortLabel }: { options:
           </Pressable>
         );
       })}
-      <View style={styles.sort}>
-        <Text style={styles.sortText}>{sortLabel}</Text>
-        <SvgIcon xml={dogSvgAssets.sort} width={7} height={5} />
-      </View>
+      <View style={styles.sort}>{sort}</View>
     </View>
   );
 }
@@ -74,5 +70,4 @@ const styles = StyleSheet.create({
   chipCountActive: { backgroundColor: '#e3d4ee' },
   chipCountText: { fontFamily: fonts.pixel, fontSize: 9, lineHeight: 13, color: '#a591b0' },
   sort: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 10 },
-  sortText: { fontFamily: fonts.body, fontSize: 10.5, lineHeight: 15, color: '#9c98a2' },
 });

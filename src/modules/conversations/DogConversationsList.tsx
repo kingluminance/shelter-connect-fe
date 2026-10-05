@@ -16,7 +16,9 @@ import { fonts } from '../../shared/lib/fonts';
 import { formatRoomTime } from '../../shared/lib/chatTime';
 import { SvgIcon } from '../../shared/ui/SvgIcon';
 import { ConnectionErrorView } from '../../shared/ui/ConnectionErrorView';
+import { SortButton } from '../../shared/ui/SortButton';
 import { FilterRow, SearchBox } from './ListControls';
+import { DOG_SORTS, sortDogConversations, type DogSort } from './listSort';
 import type { HomeTabScreenNavigationProp } from '../../app/navigation';
 
 const SCENES = [
@@ -29,6 +31,7 @@ export function DogConversationsList() {
   const navigation = useNavigation<HomeTabScreenNavigationProp>();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'saved'>('all');
+  const [sort, setSort] = useState<DogSort>('RECENT');
   const { state, reload } = useDogConversations({ q: search, savedOnly: filter === 'saved' });
   const saved = useSavedDogsList(50);
 
@@ -43,7 +46,7 @@ export function DogConversationsList() {
     );
   }
 
-  const conversations = state.status === 'ready' ? state.conversations : [];
+  const conversations = state.status === 'ready' ? sortDogConversations(state.conversations, sort) : [];
   // 저장했지만 아직 말을 걸지 않은 친구 — "처음 나눌 이야기".
   const firstChats = saved.state.status === 'ready' ? saved.state.dogs.filter(d => d.sessionId === null) : [];
   const needle = search.trim().toLowerCase();
@@ -59,7 +62,7 @@ export function DogConversationsList() {
         ]}
         selected={filter}
         onSelect={key => setFilter(key as 'all' | 'saved')}
-        sortLabel="최근 대화순"
+        sort={<SortButton options={DOG_SORTS} value={sort} onChange={setSort} />}
       />
 
       {state.status === 'loading' && <ActivityIndicator style={styles.gap} />}

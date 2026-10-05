@@ -6,12 +6,12 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { MapPin, Pencil, Search, Users } from 'lucide-react-native';
 import { fonts } from '../../shared/lib/fonts';
 import { ConnectionErrorView } from '../../shared/ui/ConnectionErrorView';
-import { SvgIcon } from '../../shared/ui/SvgIcon';
-import { svgAssets as dogSvgAssets } from '../dog/assets/svgAssets';
+import { SortButton } from '../../shared/ui/SortButton';
 import { useAuthSession } from '../../shared/lib/useAuthSession';
 import { useCommunityPosts } from './hooks/useCommunityPosts';
 import { useCommunityRegion } from './hooks/useCommunityRegion';
 import { PostCard } from './components/PostCard';
+import { POST_SORTS, sortPosts, type PostSort } from './postText';
 import type { CommunityCategory } from './types';
 import type { HomeTabScreenNavigationProp } from '../../app/navigation';
 
@@ -31,6 +31,7 @@ export function CommunityScreen() {
   const regionLabel = regionState.status === 'ready' ? regionState.regionLabel : null;
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<CommunityCategory | 'ALL'>('ALL');
+  const [sort, setSort] = useState<PostSort>('RECENT');
   const [editingRegion, setEditingRegion] = useState(false);
   const [regionDraft, setRegionDraft] = useState('');
   const [regionError, setRegionError] = useState<string | null>(null);
@@ -99,10 +100,7 @@ export function CommunityScreen() {
 
       <View style={styles.listHeader}>
         <Text style={styles.listTitle}>우리 동네 소식</Text>
-        <View style={styles.sort}>
-          <Text style={styles.sortText}>최신순</Text>
-          <SvgIcon xml={dogSvgAssets.sort} width={7} height={5} />
-        </View>
+        <SortButton options={POST_SORTS} value={sort} onChange={setSort} />
       </View>
     </View>
   );
@@ -121,7 +119,7 @@ export function CommunityScreen() {
       </Svg>
 
       <FlatList
-        data={state.status === 'ready' ? state.posts : []}
+        data={state.status === 'ready' ? sortPosts(state.posts, sort) : []}
         keyExtractor={post => post.id}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
@@ -217,8 +215,6 @@ const styles = StyleSheet.create({
   chipTextActive: { color: '#8c749f' },
   listHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 26, marginBottom: 16, marginLeft: 1 },
   listTitle: { fontFamily: fonts.pixel, fontSize: 16, lineHeight: 22, color: '#747186' },
-  sort: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  sortText: { fontFamily: fonts.body, fontSize: 10.5, lineHeight: 15, color: '#9c98a2' },
   gap: { marginTop: 16 },
   empty: { minHeight: 268, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: '#fffef8', borderWidth: 1, borderColor: '#e2dacf', borderRadius: 18 },
   emptyTitle: { fontFamily: fonts.pixel, fontSize: 17, lineHeight: 24, color: '#8c7c9b' },
