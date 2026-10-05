@@ -67,27 +67,27 @@ Skia 캔버스에 렌더 (도트 스프라이트, `core/assets/dog/dogWalkAtlas.
   지금의 배포 강아지 4마리는 전부 같은 기본 동작(가만히/걷기/앉기)만 하고, 강아지마다 달라지려면 보호소가 관찰을 CONFIRMED로
   등록하고 행동 제안을 확인해야 한다(관리자 API `/v1/shelter-admin/dogs/{id}/behavior/*`).
 
-## 공놀이(공 물어오기)
-구현 완료: `src/modules/game/core/systems/ballPlay.ts` (순수 로직, `movement.ts`의 `stepMovement`·
-`dogStateMachine.ts`의 `TILE_SIZE_MAP_UNITS`/`DOG_RADIUS` 재사용) + `GameScreen.tsx`의 "공 던지기" 탭 버튼
-(프로토타입의 E키 대응 — 모바일이라 버튼 방식).
+## 공놀이(공 받기 → 던지기 → 물어오기)
+프로토타입(`HANN-Creator/shelter-connect` `work/mobile-concept/ball-play.js`·`natural-dogs.js`)의 흐름을 옮겼다.
+구현: `core/systems/ballPlay.ts`(순수 로직, 테스트 `ballPlay.test.ts`) + `core/entities/BallSprite.tsx`(도트 공·그림자) +
+`GameScreen.tsx`의 단일 "공" 버튼. 공은 땅에서 시작한다.
 
-백엔드는 `DogBehaviorSettings.ballPlay`(`chaseEnabled`/`returnEnabled`/`reactionDelayMs`) 세 필드만
-내려주고 "이동·공 충돌과 복귀 경로는 앱에서 처리해"(dog-behavior-api.md)라고 명시 — 5단계 상태
-흐름(`THROWN → CHASING → GRABBING → RETURNING → DROPPING`)은 옵시디언 프로토타입의 UX 설계를 그대로
-차용한 FE 자체 구현이며, 성격 파라미터(playfulness 등 예전 모델)는 쓰지 않는다.
-
-- `chaseEnabled=false`면 탭해도 무시(`throwBall`이 원래 상태 그대로 반환)
-- 쫓아갈 때 속도는 RUN weight>0이면 RUN, 아니면 WALK (백엔드 문서 그대로)
-- `returnEnabled=false`면 GRABBING 다음 바로 DROPPING — 가져오기 단계 생략
-- 공놀이 중엔 `tickDog`(8종 배회 FSM)을 아예 호출하지 않음 — 끝나면 이전 상태·쿨다운에서 그대로 재개
-- 던지는 방향은 플레이어의 마지막 이동 방향(`lastDirectionRef`), 고정 거리(`THROW_DISTANCE`)만큼
-- 공 자체도 depth 정렬 대상(`ball.ballY`)이라 props 앞/뒤 렌더링이 강아지·플레이어와 일관됨
-- 실제 배포 서버 강아지들은 전부 `basis: DEFAULT` → 서버값대로면 `chaseEnabled: false`라 공 던지기 버튼이 안 뜬다.
-  **데모용으로 `useShelterDogs`의 `DEMO_BALL_PLAY`가 DEFAULT 강아지의 공놀이(가져오기 포함)를 켠다**(`normalizeBehavior`의 `demoBallPlay`).
-  보호소가 확정한(CONFIRMED) 강아지나 `BALL_CHASE.enabled`인 강아지는 항상 서버값을 따른다 — 확정값이 들어오면 플래그를 지울 것
-- 공놀이 자세: 쫓을 땐 RUN(RUN 비중 0이면 WALK) · 물어오는 중엔 WALK + 공을 입 높이로 들어 올려 그림 · 물기/내려놓기는 SNIFF · 던지고 기다릴 땐 IDLE
-- 테스트: `ballPlay.test.ts` — 거부 조건 2개 + returnEnabled true/false 전체 사이클 각 1개
+```
+REST ──(플레이어 75 이내)──▶ FETCH(공 쪽으로 달려감) ─▶ PICK(고개 숙임 0.65s) ─▶ RETURN(공을 입에 물고 플레이어 옆으로)
+   ▲                                                                                  │
+   │                                                                                OFFER(물고 기다림) ──[공 받기]──▶ RECEIVING(0.6s, 플레이어 pull)
+   │                                                                                                                      │
+   └─(플레이어가 120 이상 멀어지면 내려놓음)                                                       FLIGHT(0.7s 포물선) ◀─ WINDUP(0.28s, push) ◀─[공 던지기]─ READY(손에 공)
+                                                                                                    └─(0.16s 뒤 강아지 출발)▶ FETCH …
+```
+- 버튼 라벨(프로토 그대로): `공 받기` / `공 던지기` / `넓은 곳에서 던지기`(던질 곳 없음) / `{이름} 가까이 가기` / 진행 중 `받는 중·던지는 중·날아가는 중·가져오는 중·줍는 중`.
+- 던질 곳: `findThrowTarget` — 플레이어→강아지 방향 기준 reach·각도 후보 중 강아지에서 멀고 서 있을 수 있으며 일직선이 막히지 않은 곳(`pointFree`).
+- 거리·반경은 프로토 px × ~1.4(RN 강아지가 더 큼), 이동 속도는 **백엔드 행동 설정의 RUN/WALK**(RUN 비중 0이면 WALK). `returnEnabled=false`면 줍고 그 자리에 내려놓음.
+- 강아지 자세: 쫓을 땐 RUN/WALK, 줍기 SNIFF(고개 숙임), 돌아올 땐 WALK, 기다릴 땐 IDLE(플레이어를 바라봄). 입에 문 공은 `mouthPoint`를 따라가며 그림(전용 스프라이트 없음 — 백엔드가 만들지 않기로 함).
+- 플레이어 던지기/받기 동작: `assets/character/player-actions.png`(프로토 atlas의 push/pull을 32×32로 패딩) — 동작 동안 플레이어는 멈춤.
+- 공놀이 중엔 `tickDog`(배회)를 돌리지 않고, 끝나면(REST) 이어서 돈다.
+- 켜짐 조건은 `settings.ballPlay.chaseEnabled`. 배포 서버 강아지는 전부 DEFAULT라 `useShelterDogs`의 `DEMO_BALL_PLAY`가 데모용으로 켠다(확정값이 오면 서버값 우선).
+- **하지 않은 것**: 프로토의 A* 경로탐색(막힌 곳은 던질 곳을 거르는 걸로 대체), 평소 공 물고 다니는 자율 루프.
 
 ## 맵
 3종 맵 에셋 확보 완료 (`src/modules/game/core/assets/maps/`) — 낱개 타일 PNG + JSON 배치 방식

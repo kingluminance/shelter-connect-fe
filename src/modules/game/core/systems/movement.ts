@@ -26,6 +26,14 @@ function circleHitsRect(cx: number, cy: number, radius: number, rect: Rect): boo
   return dx * dx + dy * dy < radius * radius;
 }
 
+/** Can a circle of `radius` stand at (x, y)? — inside the bounds and clear of every obstacle. */
+export function pointFree(x: number, y: number, radius: number, bounds: Bounds, obstacles: Rect[]): boolean {
+  if (x < bounds.left + radius || x > bounds.right - radius || y < bounds.top + radius || y > bounds.bottom - radius) {
+    return false;
+  }
+  return !obstacles.some(o => circleHitsRect(x, y, radius, o));
+}
+
 /**
  * Moves a circular actor by (dx, dy) * speed * dt, resolving axis-by-axis against
  * obstacles (so sliding along a wall works) and clamping to the map bounds.
