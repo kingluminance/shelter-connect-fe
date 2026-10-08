@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>게임 튜너 — 스프라이트 크기 · 충돌 구역</title>
+<style>
+  :root { --bg:#1e2230; --panel:#262b3c; --line:#3a4157; --ink:#e7eaf3; --mute:#9aa3bd; --accent:#8fb4ff; --warn:#ffb86b; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:13px/1.45 -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+  #app { display:flex; height:100%; }
+  #stage { position:relative; flex:1; min-width:0; }
+  canvas { display:block; width:100%; height:100%; cursor:crosshair; background:#12151f; }
+  #hud { position:absolute; left:12px; top:12px; display:flex; gap:6px; flex-wrap:wrap; max-width:calc(100% - 24px); pointer-events:none; }
+  #hud > * { pointer-events:auto; }
+  button, select { background:#323852; color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:6px 10px; font:inherit; cursor:pointer; }
+  button { white-space:nowrap; }
+  button:hover { background:#3c4466; }
+  button.on { background:var(--accent); color:#0d1220; border-color:var(--accent); }
+  #status { position:absolute; left:12px; bottom:10px; color:var(--mute); background:#12151fcc; padding:4px 8px; border-radius:6px; pointer-events:none; }
+  #panel { width:380px; overflow-y:auto; background:var(--panel); border-left:1px solid var(--line); padding:14px; }
+  h2 { font-size:13px; margin:18px 0 8px; color:var(--accent); letter-spacing:.2px; }
+  h2:first-child { margin-top:0; }
+  .row { display:grid; grid-template-columns: 104px 1fr 62px; gap:8px; align-items:center; margin:5px 0; }
+  .row label { color:var(--mute); }
+  .row input[type=number] { width:100%; background:#1b1f2d; color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:4px 6px; font:inherit; }
+  .row input[type=range] { width:100%; }
+  .hint { color:var(--mute); font-size:11.5px; margin:2px 0 8px; }
+  .obst { display:grid; grid-template-columns: repeat(4, 1fr); gap:6px; }
+  .obst label { color:var(--mute); font-size:11px; display:block; }
+  .obst input { width:100%; background:#1b1f2d; color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:4px 6px; font:inherit; }
+  .checks { display:grid; grid-template-columns: 1fr 1fr; gap:4px 10px; }
+  .checks label { display:flex; gap:6px; align-items:center; cursor:pointer; }
+  textarea { width:100%; height:150px; background:#12151f; color:#cfe0ff; border:1px solid var(--line); border-radius:8px; padding:8px; font:11.5px/1.5 ui-monospace, Menlo, monospace; resize:vertical; }
+  .btns { display:flex; gap:6px; flex-wrap:wrap; margin:6px 0; }
+  .tag { display:inline-block; padding:1px 7px; border-radius:99px; font-size:11px; background:#323852; color:var(--mute); }
+  kbd { background:#323852; border:1px solid var(--line); border-bottom-width:2px; border-radius:4px; padding:0 5px; font-size:11px; }
+  .legend span { display:inline-flex; align-items:center; gap:5px; margin-right:12px; color:var(--mute); }
+  .legend i { width:11px; height:11px; border-radius:3px; display:inline-block; }
+  @media (max-width: 900px) {
+    #app { flex-direction: column; height: auto; min-height: 100%; }
+    #stage { flex: none; height: 62vh; }
+    #panel { width: 100%; border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+    html, body { height: auto; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="hud">
+      <button id="m-select" class="on" title="선택·이동·크기 조절">선택/이동</button>
+      <button id="m-draw" title="드래그해서 새 충돌 사각형 추가">＋ 충돌 구역 그리기</button>
+      <button id="m-walk" title="WASD/방향키로 플레이어를 걸어 보며 충돌 확인 (Shift = 달리기)">▶ 걸어서 테스트</button>
+      <button id="undo">↶ 되돌리기</button>
+      <button id="fit">화면 맞추기</button>
+    </div>
+    <div id="status">준비 중…</div>
+  </div>
+  <div id="panel">
+    <h2>범례</h2>
+    <div class="legend">
+      <span><i style="background:#ff5d5d88"></i>맵 충돌(장애물)</span>
+      <span><i style="background:#4ade80aa"></i>강아지가 막는 영역</span>
+      <span><i style="background:#ffb86b"></i>플레이어 충돌</span>
+      <span><i style="background:#6ea8ff"></i>강아지 이동 충돌</span>
+    </div>
+    <div class="hint">강아지(발 위치)와 플레이어를 <b>드래그</b>해서 옮기고, 빨간 사각형은 클릭해서 <b>이동·모서리 드래그로 크기</b> 조절, <kbd>Delete</kbd>로 삭제, 방향키로 1칸씩 이동. 마우스 휠 = 확대/축소, 빈 곳 드래그 = 화면 이동.</div>
+
+    <h2>스프라이트 · 충돌 값 (GameScreen.tsx)</h2>
+    <div id="sliders"></div>
+
+    <h2>선택한 충돌 구역</h2>
+    <div id="obstInfo" class="hint">빨간 사각형을 클릭하세요.</div>
+    <div class="obst" id="obstFields" hidden>
+      <div><label>x</label><input id="ox" type="number" step="1"></div>
+      <div><label>y</label><input id="oy" type="number" step="1"></div>
+      <div><label>w</label><input id="ow" type="number" step="1"></div>
+      <div><label>h</label><input id="oh" type="number" step="1"></div>
+    </div>
+    <div class="btns"><button id="delObst">선택 삭제</button><button id="dupObst">복제</button></div>
+
+    <h2>보기</h2>
+    <div class="checks" id="layers"></div>
+    <div class="row"><label>스냅(맵 단위)</label><select id="snap"><option>1</option><option selected>2</option><option>4</option><option>8</option></select><span></span></div>
+
+    <h2>내보내기 — 코드에 붙여넣기</h2>
+    <div class="hint">값을 바꾸면 아래가 자동으로 갱신돼요. 각 블록 맨 위 주석의 파일에서 같은 이름의 줄을 바꾸면 됩니다.</div>
+    <div class="btns"><button id="copyCode">코드 값 복사</button></div>
+    <textarea id="codeOut" readonly></textarea>
+    <h2>충돌 구역(layout.json의 obstacles)</h2>
+    <div id="diff" class="hint"></div>
+    <div class="btns">
+      <button id="copyObst">obstacles 배열 복사</button>
+      <button id="dlLayout">layout.json 내려받기</button>
+      <button id="reset">처음 값으로 되돌리기</button>
+    </div>
+    <div class="hint">내려받은 <code>layout.json</code>을 <code>src/modules/game/core/assets/maps/01-sunny-meadow/map/</code> 의 같은 파일에 덮어쓰면 반영돼요.</div>
+    <textarea id="obstOut" readonly></textarea>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script>
+(() => {
+  const D = window.TUNER_DATA;
+  if (!D) { document.getElementById('status').textContent = 'data.js가 없어요 — 터미널에서 npm run tuner 를 실행하세요'; return; }
+  const $ = id => document.getElementById(id);
+  const clone = v => JSON.parse(JSON.stringify(v));
+  const KEY = 'game-tuner-v1';
+  const bounds = D.layout.bounds;
+  const PHONE = { w: 393, h: 852 }; // 폰 화면 비율(보이는 맵 범위 표시용)
+
+  // ---- state ---------------------------------------------------------------
+  const saved = (() => { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { return null; } })();
+  const S = {
+    c: { ...D.constants, ...(saved?.c || {}) },
+    obstacles: clone(saved?.obstacles || D.layout.obstacles),
+    dog: saved?.dog || { x: D.layout.slots[0].x, y: D.layout.slots[0].y },
+    player: saved?.player || { x: D.layout.spawn.x - 40, y: D.layout.spawn.y },
+    facing: 'DOWN',
+    sel: -1, snap: 2, mode: 'select',
+    view: { z: 1.4, ox: 0, oy: 0 },
+    layers: saved?.layers || { props: true, obst: true, bounds: true, coll: true, rings: true, viewport: false, slots: false },
+    history: [],
+  };
+  const persist = () => { try { localStorage.setItem(KEY, JSON.stringify({ c: S.c, obstacles: S.obstacles, dog: S.dog, player: S.player, layers: S.layers })); } catch {} };
+  const pushHistory = () => { S.history.push(JSON.stringify({ o: S.obstacles, dog: S.dog, player: S.player })); if (S.history.length > 80) S.history.shift(); };
+
+  // ---- images ----------------------------------------------------------------
+  const img = src => { const i = new Image(); i.onload = () => draw(); i.onerror = () => console.warn('이미지 로드 실패', src); i.src = src; return i; };
+  const IM = { ground: img(D.assets.ground), dogDown: img(D.assets.dogDown), dogUp: img(D.assets.dogUp), dogSide: img(D.assets.dogSide), player: img(D.assets.player) };
+  const propImgs = {};
+  const propImg = name => propImgs[name] || (propImgs[name] = img(D.assets.propDir + name + '.png'));
+
+  // ---- the game's own movement rule (core/systems/movement.ts) ------------------
+  const circleHitsRect = (cx, cy, r, o) => { const x = Math.max(o.x, Math.min(cx, o.x + o.w)), y = Math.max(o.y, Math.min(cy, o.y + o.h)); const dx = cx - x, dy = cy - y; return dx * dx + dy * dy < r * r; };
+  function stepMovement({ x, y, dx, dy, speed, dt, radius, obstacles }) {
+    const len = Math.hypot(dx, dy); if (!len) return { x, y };
+    const step = speed * dt, mx = dx / len * step, my = dy / len * step;
+    let nx = x + mx; if (obstacles.some(o => circleHitsRect(nx, y, radius, o))) nx = x;
+    let ny = y + my; if (obstacles.some(o => circleHitsRect(nx, ny, radius, o))) ny = y;
+    return { x: Math.min(Math.max(nx, bounds.left + radius), bounds.right - radius), y: Math.min(Math.max(ny, bounds.top + radius), bounds.bottom - radius) };
+  }
+  const dogBlock = () => {
+    const r = S.c.dogDisplaySize * S.c.dogCollisionRadiusRatio;
+    const cy = S.dog.y - S.c.dogDisplaySize * S.c.dogCollisionYOffsetRatio;
+    return { cx: S.dog.x, cy, r, rect: { x: S.dog.x - r, y: cy - r, w: r * 2, h: r * 2 } };
+  };
+
+  // ---- canvas / view -----------------------------------------------------------
+  const cv = $('cv'), ctx = cv.getContext('2d');
+  let dpr = 1, W = 0, H = 0;
+  function resize() { dpr = window.devicePixelRatio || 1; const r = cv.getBoundingClientRect(); W = r.width; H = r.height; cv.width = r.width * dpr; cv.height = r.height * dpr; draw(); }
+  const toWorld = (sx, sy) => ({ x: (sx - S.view.ox) / S.view.z, y: (sy - S.view.oy) / S.view.z });
+  function fit() { const z = Math.min(W / 660, H / 660); S.view = { z, ox: (W - 640 * z) / 2, oy: (H - 640 * z) / 2 }; draw(); }
+
+  // ---- draw ----------------------------------------------------------------------
+  function drawDog(c) {
+    const size = c.dogDisplaySize, scale = size / 64;
+    const sheet = S.facing === 'UP' ? IM.dogUp : S.facing === 'DOWN' ? IM.dogDown : IM.dogSide;
+    if (!sheet.complete || !sheet.naturalWidth) return;
+    ctx.save();
+    ctx.translate(S.dog.x, S.dog.y);
+    if (S.facing === 'LEFT') ctx.scale(-1, 1);
+    ctx.drawImage(sheet, 0, 0, 64, 64, -32 * scale, -60 * scale, size, size);
+    ctx.restore();
+  }
+  function drawPlayer(c) {
+    if (!IM.player.complete || !IM.player.naturalWidth) return;
+    const size = c.playerDisplaySize;
+    ctx.drawImage(IM.player, 0, 0, 24, 24, S.player.x - size / 2, S.player.y - size / 2, size, size);
+  }
+  function circle(x, y, r, stroke, dash, fill) {
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    ctx.setLineDash(dash || []); ctx.strokeStyle = stroke; ctx.lineWidth = 1.4 / S.view.z; ctx.stroke(); ctx.setLineDash([]);
+  }
+  function label(text, x, y, color) { ctx.save(); ctx.font = `${11 / S.view.z}px sans-serif`; ctx.fillStyle = color; ctx.fillText(text, x, y); ctx.restore(); }
+
+  function draw() {
+    if (!W) return;
+    const c = S.c;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.imageSmoothingEnabled = false;
+    ctx.setTransform(dpr * S.view.z, 0, 0, dpr * S.view.z, dpr * S.view.ox, dpr * S.view.oy);
+
+    if (IM.ground.complete) ctx.drawImage(IM.ground, 0, 0, 640, 640);
+    const list = [];
+    if (S.layers.props) D.layout.objects.forEach(o => list.push({ depth: o.depth, draw: () => { const im = propImg(o.asset); if (im.complete && im.naturalWidth) ctx.drawImage(im, o.x, o.y, o.w, o.h); } }));
+    list.push({ depth: S.dog.y, draw: () => drawDog(c) }, { depth: S.player.y, draw: () => drawPlayer(c) });
+    list.sort((a, b) => a.depth - b.depth).forEach(e => e.draw());
+
+    if (S.layers.bounds) { ctx.strokeStyle = '#6ea8ff'; ctx.setLineDash([6 / S.view.z, 4 / S.view.z]); ctx.lineWidth = 1.4 / S.view.z; ctx.strokeRect(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top); ctx.setLineDash([]); }
+    if (S.layers.obst) {
+      S.obstacles.forEach((o, i) => { ctx.fillStyle = i === S.sel ? '#ff5d5da8' : '#ff5d5d4a'; ctx.fillRect(o.x, o.y, o.w, o.h); ctx.strokeStyle = i === S.sel ? '#fff' : '#ff8a8a'; ctx.lineWidth = (i === S.sel ? 1.8 : 0.8) / S.view.z; ctx.strokeRect(o.x, o.y, o.w, o.h); });
+      const o = S.obstacles[S.sel];
+      if (o) handles(o).forEach(h => { ctx.fillStyle = '#fff'; ctx.strokeStyle = '#d33'; ctx.lineWidth = 1 / S.view.z; const s = 5 / S.view.z; ctx.fillRect(h.x - s, h.y - s, s * 2, s * 2); ctx.strokeRect(h.x - s, h.y - s, s * 2, s * 2); });
+    }
+    if (S.layers.slots) { D.layout.slots.forEach((s, i) => { circle(s.x, s.y, 3, '#ffe066'); label('슬롯' + (i + 1), s.x + 5, s.y - 4, '#ffe066'); }); circle(D.layout.spawn.x, D.layout.spawn.y, 4, '#7dffb2'); label('스폰', D.layout.spawn.x + 6, D.layout.spawn.y - 4, '#7dffb2'); }
+    if (S.layers.coll) {
+      const b = dogBlock();
+      ctx.fillStyle = '#4ade8055'; ctx.fillRect(b.rect.x, b.rect.y, b.rect.w, b.rect.h);
+      ctx.strokeStyle = '#4ade80'; ctx.lineWidth = 1.4 / S.view.z; ctx.strokeRect(b.rect.x, b.rect.y, b.rect.w, b.rect.h);
+      circle(S.dog.x, S.dog.y, 1.6, '#4ade80', null, '#4ade80');
+      circle(S.dog.x, S.dog.y, c.dogRadius, '#6ea8ff', [3 / S.view.z, 3 / S.view.z]);
+      circle(S.player.x, S.player.y, c.playerRadius, '#ffb86b', null, '#ffb86b33');
+    }
+    if (S.layers.rings) {
+      circle(S.dog.x, S.dog.y, c.talkRange, '#f0abfc', [5 / S.view.z, 4 / S.view.z]); label('말 걸기 ' + c.talkRange, S.dog.x + c.talkRange * 0.7, S.dog.y - c.talkRange * 0.7, '#f0abfc');
+      circle(S.dog.x, S.dog.y, c.engageDistance, '#fde68a', [5 / S.view.z, 4 / S.view.z]); label('공 가져오기 시작 ' + c.engageDistance, S.dog.x - c.engageDistance * 0.9, S.dog.y - c.engageDistance * 0.45, '#fde68a');
+      circle(S.dog.x, S.dog.y, c.receiveDistance, '#a7f3d0', [5 / S.view.z, 4 / S.view.z]); label('공 받기 ' + c.receiveDistance, S.dog.x + c.receiveDistance * 0.35, S.dog.y + c.receiveDistance + 8, '#a7f3d0');
+      circle(S.dog.x, S.dog.y, c.throwRange, '#bae6fd', [5 / S.view.z, 4 / S.view.z]); label('공 던지기 ' + c.throwRange, S.dog.x - c.throwRange, S.dog.y + c.throwRange * 0.3, '#bae6fd');
+      circle(S.dog.x, S.dog.y, c.leaveDistance, '#fca5a5', [5 / S.view.z, 6 / S.view.z]); label('공 내려놓음 ' + c.leaveDistance, S.dog.x - c.leaveDistance * 0.8, S.dog.y + c.leaveDistance * 0.85, '#fca5a5');
+    }
+    if (S.layers.viewport) {
+      const w = c.viewportMapUnits, h = w * PHONE.h / PHONE.w;
+      ctx.strokeStyle = '#c4b5fd'; ctx.lineWidth = 2 / S.view.z; ctx.setLineDash([8 / S.view.z, 5 / S.view.z]); ctx.strokeRect(S.player.x - w / 2, S.player.y - h / 2, w, h); ctx.setLineDash([]);
+      label(`폰 화면에 보이는 범위 (${w}×${Math.round(h)})`, S.player.x - w / 2 + 4, S.player.y - h / 2 + 12 / S.view.z, '#c4b5fd');
+    }
+    if (drag?.kind === 'draw' && drag.rect) { const r = drag.rect; ctx.fillStyle = '#7dd3fc55'; ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeStyle = '#7dd3fc'; ctx.lineWidth = 1.2 / S.view.z; ctx.strokeRect(r.x, r.y, r.w, r.h); }
+    label('강아지(발)', S.dog.x - 20, S.dog.y + 14 / S.view.z + 4, '#ffffffcc');
+  }
+
+  // ---- obstacle handles / hit-testing ------------------------------------------------
+  function handles(o) {
+    const xs = [o.x, o.x + o.w / 2, o.x + o.w], ys = [o.y, o.y + o.h / 2, o.y + o.h], out = [];
+    const names = [['nw', 0, 0], ['n', 1, 0], ['ne', 2, 0], ['w', 0, 1], ['e', 2, 1], ['sw', 0, 2], ['s', 1, 2], ['se', 2, 2]];
+    names.forEach(([name, cx, cy]) => out.push({ name, x: xs[cx], y: ys[cy] }));
+    return out;
+  }
+  const near = (a, b, r) => Math.abs(a.x - b.x) <= r && Math.abs(a.y - b.y) <= r;
+  function hit(p) {
+    const tol = 8 / S.view.z;
+    const o = S.obstacles[S.sel];
+    if (o && S.layers.obst) { const h = handles(o).find(h => near(h, p, tol)); if (h) return { kind: 'handle', name: h.name }; }
+    const dogBox = { x: S.dog.x - S.c.dogDisplaySize / 2, y: S.dog.y - S.c.dogDisplaySize * 0.95, w: S.c.dogDisplaySize, h: S.c.dogDisplaySize };
+    if (p.x >= dogBox.x && p.x <= dogBox.x + dogBox.w && p.y >= dogBox.y && p.y <= dogBox.y + dogBox.h) return { kind: 'dog' };
+    const ps = S.c.playerDisplaySize;
+    if (Math.abs(p.x - S.player.x) <= ps / 2 && Math.abs(p.y - S.player.y) <= ps / 2) return { kind: 'player' };
+    if (S.layers.obst) for (let i = S.obstacles.length - 1; i >= 0; i--) { const r = S.obstacles[i]; if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) return { kind: 'obstacle', index: i }; }
+    return { kind: 'bg' };
+  }
+  const snap = v => Math.round(v / S.snap) * S.snap;
+
+  // ---- pointer ---------------------------------------------------------------------------
+  let drag = null;
+  cv.addEventListener('pointerdown', e => {
+    cv.setPointerCapture(e.pointerId);
+    const rect = cv.getBoundingClientRect(), sx = e.clientX - rect.left, sy = e.clientY - rect.top, p = toWorld(sx, sy);
+    if (S.mode === 'walk') { return; }
+    if (S.mode === 'draw') { pushHistory(); drag = { kind: 'draw', start: { x: snap(p.x), y: snap(p.y) }, rect: null }; return; }
+    const h = hit(p);
+    if (h.kind === 'handle') { pushHistory(); drag = { kind: 'handle', name: h.name, orig: { ...S.obstacles[S.sel] } }; return; }
+    if (h.kind === 'dog') { pushHistory(); drag = { kind: 'dog', dx: S.dog.x - p.x, dy: S.dog.y - p.y }; return; }
+    if (h.kind === 'player') { pushHistory(); drag = { kind: 'player', dx: S.player.x - p.x, dy: S.player.y - p.y }; return; }
+    if (h.kind === 'obstacle') { S.sel = h.index; pushHistory(); drag = { kind: 'move', dx: S.obstacles[h.index].x - p.x, dy: S.obstacles[h.index].y - p.y }; refreshObst(); draw(); return; }
+    S.sel = -1; refreshObst();
+    drag = { kind: 'pan', sx, sy, ox: S.view.ox, oy: S.view.oy }; draw();
+  });
+  cv.addEventListener('pointermove', e => {
+    const rect = cv.getBoundingClientRect(), sx = e.clientX - rect.left, sy = e.clientY - rect.top, p = toWorld(sx, sy);
+    $('status').textContent = `맵 좌표 x ${Math.round(p.x)}, y ${Math.round(p.y)}  ·  확대 ${S.view.z.toFixed(2)}×${S.mode === 'walk' ? '  ·  WASD/방향키로 이동, Shift=달리기' : ''}`;
+    if (!drag) return;
+    if (drag.kind === 'pan') { S.view.ox = drag.ox + (sx - drag.sx); S.view.oy = drag.oy + (sy - drag.sy); }
+    else if (drag.kind === 'dog') { S.dog = { x: Math.round(p.x + drag.dx), y: Math.round(p.y + drag.dy) }; }
+    else if (drag.kind === 'player') { S.player = { x: Math.round(p.x + drag.dx), y: Math.round(p.y + drag.dy) }; }
+    else if (drag.kind === 'move') { const o = S.obstacles[S.sel]; o.x = snap(p.x + drag.dx); o.y = snap(p.y + drag.dy); refreshObst(); }
+    else if (drag.kind === 'draw') { const a = drag.start, b = { x: snap(p.x), y: snap(p.y) }; drag.rect = { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(a.x - b.x), h: Math.abs(a.y - b.y) }; }
+    else if (drag.kind === 'handle') {
+      const o = S.obstacles[S.sel], g = drag.orig, n = drag.name, X = snap(p.x), Y = snap(p.y);
+      let l = g.x, t = g.y, r = g.x + g.w, b = g.y + g.h;
+      if (n.includes('w')) l = Math.min(X, r - S.snap); if (n.includes('e')) r = Math.max(X, l + S.snap);
+      if (n.includes('n')) t = Math.min(Y, b - S.snap); if (n.includes('s')) b = Math.max(Y, t + S.snap);
+      o.x = l; o.y = t; o.w = r - l; o.h = b - t; refreshObst();
+    }
+    draw(); outputs();
+  });
+  const end = () => {
+    if (drag?.kind === 'draw' && drag.rect && drag.rect.w >= 2 && drag.rect.h >= 2) { S.obstacles.push(drag.rect); S.sel = S.obstacles.length - 1; setMode('select'); refreshObst(); }
+    drag = null; persist(); outputs(); draw();
+  };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  cv.addEventListener('wheel', e => {
+    e.preventDefault();
+    const rect = cv.getBoundingClientRect(), sx = e.clientX - rect.left, sy = e.clientY - rect.top, before = toWorld(sx, sy);
+    S.view.z = Math.min(8, Math.max(0.4, S.view.z * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+    S.view.ox = sx - before.x * S.view.z; S.view.oy = sy - before.y * S.view.z; draw();
+  }, { passive: false });
+
+  // ---- keyboard / walk test ------------------------------------------------------------------
+  const keys = new Set();
+  window.addEventListener('keydown', e => {
+    if (e.target.matches?.('input,textarea,select')) return;
+    keys.add(e.code);
+    if (S.mode === 'walk') { if (e.code.startsWith('Arrow')) e.preventDefault(); return; }
+    if ((e.code === 'Delete' || e.code === 'Backspace') && S.sel >= 0) { e.preventDefault(); delSel(); }
+    if ((e.metaKey || e.ctrlKey) && e.code === 'KeyZ') { e.preventDefault(); undo(); }
+    const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.code];
+    if (d && S.sel >= 0) { e.preventDefault(); pushHistory(); const o = S.obstacles[S.sel]; o.x += d[0]; o.y += d[1]; refreshObst(); persist(); outputs(); draw(); }
+  });
+  window.addEventListener('keyup', e => keys.delete(e.code));
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (S.mode === 'walk') {
+      const stuck = S.obstacles.some(o => circleHitsRect(S.player.x, S.player.y, S.c.playerRadius, o));
+      if (stuck !== frame.stuck) { frame.stuck = stuck; $('status').style.color = stuck ? '#ff9b9b' : ''; if (stuck) $('status').textContent = '⚠ 플레이어가 충돌 구역 안에 있어서 움직일 수 없어요 (게임에서도 같은 현상) — 플레이어를 드래그해 빼거나 사각형을 줄이세요'; }
+      const dx = (keys.has('ArrowRight') || keys.has('KeyD') ? 1 : 0) - (keys.has('ArrowLeft') || keys.has('KeyA') ? 1 : 0);
+      const dy = (keys.has('ArrowDown') || keys.has('KeyS') ? 1 : 0) - (keys.has('ArrowUp') || keys.has('KeyW') ? 1 : 0);
+      if (dx || dy) {
+        const b = dogBlock();
+        const dogObst = Math.hypot(S.player.x - b.cx, S.player.y - b.cy) > S.c.playerRadius + b.r ? [b.rect] : []; // GameScreen.tsx와 같은 규칙
+        const speed = S.c.playerSpeed * (keys.has('ShiftLeft') || keys.has('ShiftRight') ? S.c.runMultiplier : 1);
+        S.player = stepMovement({ x: S.player.x, y: S.player.y, dx, dy, speed, dt, radius: S.c.playerRadius, obstacles: [...S.obstacles, ...dogObst] });
+        draw();
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ---- UI --------------------------------------------------------------------------------------------
+  const SPEC = [
+    ['dogDisplaySize', '강아지 크기', 20, 120, 1, '그려지는 크기(맵 단위). 클수록 큼'],
+    ['dogCollisionRadiusRatio', '강아지 충돌 반지름 비율', 0.05, 0.5, 0.01, '× 강아지 크기 → 플레이어를 막는 초록 사각형의 반 변'],
+    ['dogCollisionYOffsetRatio', '강아지 충돌 높이 비율', 0, 1.2, 0.01, '× 강아지 크기 → 발에서 위로 올려 몸통에 맞춤'],
+    ['playerDisplaySize', '플레이어 크기', 24, 120, 1, '그려지는 크기'],
+    ['playerRadius', '플레이어 충돌 반지름', 4, 30, 0.5, '주황 원 — 벽·강아지에 닿는 크기'],
+    ['dogRadius', '강아지 이동 충돌 반지름', 3, 20, 0.5, '파랑 점선 — 강아지가 벽에 닿는 크기 (dogStateMachine)'],
+    ['talkRange', '말 걸기 거리', 20, 120, 1, '이 안에 들어가면 말 걸기 버튼'],
+    ['engageDistance', '공: 가져오기 시작 거리', 30, 200, 1, 'ballPlay.ts'],
+    ['receiveDistance', '공: 받기 거리', 20, 150, 1, 'ballPlay.ts'],
+    ['throwRange', '공: 던지기 거리', 20, 200, 1, 'ballPlay.ts'],
+    ['leaveDistance', '공: 내려놓는 거리', 60, 300, 1, 'ballPlay.ts'],
+    ['viewportMapUnits', '화면 가로 범위', 100, 400, 5, '폰 가로에 보이는 맵 폭(작을수록 확대)'],
+  ];
+  const sliders = $('sliders');
+  SPEC.forEach(([key, name, min, max, step, hint]) => {
+    const row = document.createElement('div'); row.className = 'row'; row.title = hint;
+    row.innerHTML = `<label>${name}</label><input type="range" min="${min}" max="${max}" step="${step}"><input type="number" step="${step}">`;
+    const [range, num] = row.querySelectorAll('input');
+    const set = v => { v = Math.min(max * 3, Math.max(0, Number(v))); S.c[key] = v; range.value = v; num.value = +v.toFixed(3); persist(); outputs(); draw(); };
+    range.value = S.c[key]; num.value = S.c[key];
+    range.addEventListener('input', () => set(range.value)); num.addEventListener('input', () => set(num.value));
+    sliders.appendChild(row);
+  });
+  const layerNames = { props: '소품 그림', obst: '맵 충돌(빨강)', bounds: '이동 경계', coll: '캐릭터 충돌', rings: '거리 원', viewport: '폰 화면 범위', slots: '강아지 슬롯·스폰' };
+  Object.entries(layerNames).forEach(([k, name]) => {
+    const l = document.createElement('label'); l.innerHTML = `<input type="checkbox" ${S.layers[k] ? 'checked' : ''}> ${name}`;
+    l.querySelector('input').addEventListener('change', e => { S.layers[k] = e.target.checked; persist(); draw(); });
+    $('layers').appendChild(l);
+  });
+  $('snap').addEventListener('change', e => { S.snap = Number(e.target.value); });
+
+  function setMode(m) {
+    S.mode = m; drag = null;
+    ['select', 'draw', 'walk'].forEach(k => $('m-' + k).classList.toggle('on', k === m));
+    cv.style.cursor = m === 'draw' ? 'crosshair' : m === 'walk' ? 'default' : 'grab';
+    draw();
+  }
+  $('m-select').onclick = () => setMode('select'); $('m-draw').onclick = () => setMode('draw'); $('m-walk').onclick = () => setMode('walk');
+  const undo = () => { const h = S.history.pop(); if (!h) return; const v = JSON.parse(h); S.obstacles = v.o; S.dog = v.dog; S.player = v.player; S.sel = -1; refreshObst(); persist(); outputs(); draw(); };
+  $('undo').onclick = undo; $('fit').onclick = fit;
+  function delSel() { if (S.sel < 0) return; pushHistory(); S.obstacles.splice(S.sel, 1); S.sel = -1; refreshObst(); persist(); outputs(); draw(); }
+  $('delObst').onclick = delSel;
+  $('dupObst').onclick = () => { const o = S.obstacles[S.sel]; if (!o) return; pushHistory(); S.obstacles.push({ x: o.x + 8, y: o.y + 8, w: o.w, h: o.h }); S.sel = S.obstacles.length - 1; refreshObst(); persist(); outputs(); draw(); };
+  ['x', 'y', 'w', 'h'].forEach(k => $('o' + k).addEventListener('input', e => { const o = S.obstacles[S.sel]; if (!o) return; o[k] = Number(e.target.value); persist(); outputs(); draw(); }));
+  function refreshObst() {
+    const o = S.obstacles[S.sel];
+    $('obstFields').hidden = !o;
+    $('obstInfo').textContent = o ? `#${S.sel + 1} / ${S.obstacles.length}` : '빨간 사각형을 클릭하세요.';
+    if (o) { $('ox').value = o.x; $('oy').value = o.y; $('ow').value = o.w; $('oh').value = o.h; }
+  }
+
+  const fmt = v => String(+Number(v).toFixed(3));
+  function codeText() {
+    const c = S.c;
+    return [
+      '// src/modules/game/GameScreen.tsx',
+      `const DOG_DISPLAY_SIZE = ${fmt(c.dogDisplaySize)};`,
+      `const DOG_COLLISION_RADIUS = DOG_DISPLAY_SIZE * ${fmt(c.dogCollisionRadiusRatio)};`,
+      `const DOG_COLLISION_Y_OFFSET = DOG_DISPLAY_SIZE * ${fmt(c.dogCollisionYOffsetRatio)};`,
+      `const PLAYER_RADIUS = ${fmt(c.playerRadius)};`,
+      `const PLAYER_DISPLAY_SIZE = ${fmt(c.playerDisplaySize)};`,
+      `const TALK_RANGE = ${fmt(c.talkRange)};`,
+      `const VIEWPORT_MAP_UNITS = ${fmt(c.viewportMapUnits)};`,
+      '',
+      '// src/modules/game/core/systems/dogStateMachine.ts',
+      `export const DOG_RADIUS = ${fmt(c.dogRadius)};`,
+      '',
+      '// src/modules/game/core/systems/ballPlay.ts',
+      `export const ENGAGE_DISTANCE = ${fmt(c.engageDistance)};`,
+      `export const LEAVE_DISTANCE = ${fmt(c.leaveDistance)};`,
+      `export const RECEIVE_DISTANCE = ${fmt(c.receiveDistance)};`,
+      `export const THROW_RANGE = ${fmt(c.throwRange)};`,
+    ].join('\n');
+  }
+  const obstKey = o => `${o.x},${o.y},${o.w},${o.h}`;
+  function outputs() {
+    $('codeOut').value = codeText();
+    const orig = new Set(D.layout.obstacles.map(obstKey)), now = new Set(S.obstacles.map(obstKey));
+    const added = [...now].filter(k => !orig.has(k)).length, removed = [...orig].filter(k => !now.has(k)).length;
+    $('diff').textContent = added || removed ? `원본 ${D.layout.obstacles.length}개 → 현재 ${S.obstacles.length}개 (새로/바뀐 ${added}, 사라진/바뀐 ${removed})` : `원본과 같아요 (${S.obstacles.length}개)`;
+    $('obstOut').value = JSON.stringify(S.obstacles);
+  }
+  const copy = (text, btn) => navigator.clipboard.writeText(text).then(() => { const t = btn.textContent; btn.textContent = '복사됨 ✓'; setTimeout(() => (btn.textContent = t), 1200); }, () => { btn.textContent = '복사 실패 — 아래 칸에서 직접 복사'; });
+  $('copyCode').onclick = e => copy($('codeOut').value, e.target);
+  $('copyObst').onclick = e => copy($('obstOut').value, e.target);
+  $('dlLayout').onclick = () => {
+    const out = { ...D.layout, obstacles: S.obstacles };
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2) + '\n'], { type: 'application/json' })); a.download = 'layout.json'; a.click();
+  };
+  $('reset').onclick = () => {
+    if (!confirm('모든 값과 충돌 구역을 처음(코드에 있는 값)으로 되돌릴까요?')) return;
+    localStorage.removeItem(KEY); location.reload();
+  };
+
+  window.__tuner = { S, draw }; // 디버깅용
+  window.addEventListener('resize', resize);
+  resize(); fit(); refreshObst(); outputs(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
