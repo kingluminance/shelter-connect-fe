@@ -34,6 +34,7 @@ import {
   findThrowTarget,
   isBallPlayActive,
   startReceive,
+  BASE_DOG_SIZE,
   startThrow,
   tickBallPlay,
   type BallPlayState,
@@ -45,7 +46,7 @@ import { Joystick } from './input/Joystick';
 import { useShelterDogs, type DogWithBehavior } from '../dog/hooks/useShelterDogs';
 import type { RootStackParamList } from '../../app/navigation';
 
-const DOG_DISPLAY_SIZE = 44;
+const DOG_DISPLAY_SIZE = 27;
 // Where the dog sprite is drawn relative to the dog's ground point (map units, +x right / +y down).
 // Tuned with tools/game-tuner (docs/game-tuner.md).
 const DOG_SPRITE_OFFSET = { x: 0, y: 0 };
@@ -60,11 +61,11 @@ const DOG_COLLISION_Y_OFFSET = DOG_DISPLAY_SIZE * 0.22;
 // Pixel art, nearest-neighbor only — no blur from bilinear interpolation on upscale.
 const NEAREST_SAMPLING = { filter: FilterMode.Nearest };
 
-const PLAYER_RADIUS = 10;
-const PLAYER_DISPLAY_SIZE = 64;
+const PLAYER_RADIUS = 11.5;
+const PLAYER_DISPLAY_SIZE = 54;
 // How far the player sprite is drawn from the collision circle's center (map units, +x right / +y down) —
 // the circle (PLAYER_RADIUS) is where the player really stands. Tuned with tools/game-tuner (docs/game-tuner.md).
-const PLAYER_SPRITE_OFFSET = { x: 0.5, y: -19 };
+const PLAYER_SPRITE_OFFSET = { x: 1, y: -17 };
 const PLAYER_SPEED = 55; // px/s of map space
 const RUN_MULTIPLIER = 1.8;
 // How many map units are visible across the viewport's width — smaller = more zoomed in.
@@ -86,7 +87,10 @@ const TALK_RANGE = 40;
 const BALL_PIXEL = 1.5;
 // The player's hand while holding / receiving the ball, relative to the drawn sprite's center
 // (collision circle center + PLAYER_SPRITE_OFFSET).
-const HAND_OFFSET = { x: 14, y: -2 };
+// (14, -2) was measured for the 64-unit player sprite — scaled with PLAYER_DISPLAY_SIZE.
+const HAND_OFFSET = { x: 14 * (PLAYER_DISPLAY_SIZE / 64), y: -2 * (PLAYER_DISPLAY_SIZE / 64) };
+// The ball sits at the dog's mouth — its offsets were measured for a 44-unit dog.
+const DOG_SCALE = DOG_DISPLAY_SIZE / BASE_DOG_SIZE;
 
 function clamp(value: number, min: number, max: number) {
   if (max < min) {
@@ -290,6 +294,7 @@ export function GameScreen() {
             dt,
             mapLayout.bounds,
             mapLayout.obstacles,
+            DOG_SCALE,
           );
           ballStatesRef.current[i] = result.state;
           if (isBallPlayActive(result.state)) {
@@ -519,7 +524,7 @@ export function GameScreen() {
       y: playerPosRef.current.y + PLAYER_SPRITE_OFFSET.y + HAND_OFFSET.y,
     };
     if (ballButton.action === 'receive') {
-      ballStatesRef.current[ballDogIndex] = startReceive(state, { x: ballDog.x, y: ballDog.y }, dogFacingRef.current[ballDogIndex] ?? DEFAULT_DOG_FACING);
+      ballStatesRef.current[ballDogIndex] = startReceive(state, { x: ballDog.x, y: ballDog.y }, dogFacingRef.current[ballDogIndex] ?? DEFAULT_DOG_FACING, DOG_SCALE);
       // The dog hands the ball over from its mouth; face it while taking it.
       facingLeft.current = ballDog.x < playerPosRef.current.x;
     } else if (ballButton.action === 'throw') {
