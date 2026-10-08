@@ -146,6 +146,7 @@ export function SavedFriendsScreen() {
                 dogId: dog.dogId,
                 dogName: dog.dogName,
                 identityIndex: dogs.indexOf(dog) % 3,
+                shelterName: dog.shelterName,
                 knownFacts: [],
                 pendingQuestions: [],
               })

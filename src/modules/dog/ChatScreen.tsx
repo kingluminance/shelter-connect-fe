@@ -87,6 +87,7 @@ export function ChatScreen() {
       dogId: params.dogId,
       dogName: params.dogName,
       identityIndex: params.identityIndex,
+      shelterName: params.shelterName,
       knownFacts: messages.filter(m => m.role === 'ASSISTANT').map(m => m.text),
       pendingQuestions,
     });
