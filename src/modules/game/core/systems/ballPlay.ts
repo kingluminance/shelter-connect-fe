@@ -68,8 +68,11 @@ export function isBallPlayActive(state: BallPlayState): boolean {
   return state.phase !== 'REST';
 }
 
-export function mouthPoint(dog: Point, facing: DogSpriteDirection): Point {
-  return { x: dog.x + (facing === 'RIGHT' ? 17 : facing === 'LEFT' ? -17 : 0), y: dog.y - (facing === 'UP' ? 25 : 17) };
+/** The offsets below were set for a 44-unit dog; pass `dogScale = displaySize / BASE_DOG_SIZE` when it is drawn at another size. */
+export const BASE_DOG_SIZE = 44;
+
+export function mouthPoint(dog: Point, facing: DogSpriteDirection, dogScale = 1): Point {
+  return { x: dog.x + (facing === 'RIGHT' ? 17 : facing === 'LEFT' ? -17 : 0) * dogScale, y: dog.y - (facing === 'UP' ? 25 : 17) * dogScale };
 }
 
 function dist(a: Point, b: Point): number {
@@ -134,9 +137,9 @@ export function ballControl(state: BallPlayState, dog: Point, dogName: string, p
 }
 
 /** Player taps 공 받기 — only while the dog is offering the ball. */
-export function startReceive(state: BallPlayState, dog: Point, facing: DogSpriteDirection): BallPlayState {
+export function startReceive(state: BallPlayState, dog: Point, facing: DogSpriteDirection, dogScale = 1): BallPlayState {
   if (state.phase !== 'OFFER') return state;
-  const mouth = mouthPoint(dog, facing);
+  const mouth = mouthPoint(dog, facing, dogScale);
   return { ...state, phase: 'RECEIVING', phaseMs: 0, from: { x: state.ballX, y: state.ballY }, shadowY: null, playerAction: 'pull', playerActionMs: 0, ballX: mouth.x, ballY: mouth.y };
 }
 
@@ -188,6 +191,7 @@ export function tickBallPlay(
   dt: number,
   bounds: Bounds,
   obstacles: Rect[],
+  dogScale = 1,
 ): { state: BallPlayState; dogPos: Point } {
   const dtMs = dt * 1000;
   const walkSpeed = settings.actions.WALK.speedTilesPerSecond;
@@ -204,7 +208,7 @@ export function tickBallPlay(
     next = { ...next, ...patch, phase, phaseMs: 0 };
   };
   const carry = (rate: number) => {
-    const mouth = mouthPoint(dogPos, dogFacing);
+    const mouth = mouthPoint(dogPos, dogFacing, dogScale);
     const dx = mouth.x - next.ballX;
     const dy = mouth.y - next.ballY;
     const d = Math.hypot(dx, dy);

@@ -1,4 +1,4 @@
-import { ballControl, ballDogPose, createBallPlayState, findThrowTarget, isBallPlayActive, startReceive, startThrow, tickBallPlay, type BallPlayState } from './ballPlay';
+import { mouthPoint, ballControl, ballDogPose, createBallPlayState, findThrowTarget, isBallPlayActive, startReceive, startThrow, tickBallPlay, type BallPlayState } from './ballPlay';
 import type { DogBehaviorSettings } from '../../../dog/types';
 
 const bounds = { left: 0, top: 0, right: 400, bottom: 400 };
@@ -153,4 +153,12 @@ test('pose: runs to the ball (walks when RUN has no weight), head down to pick, 
   expect(ballDogPose({ ...base, phase: 'RETURN' }, walkOnly)).toBe('WALK');
   expect(ballDogPose({ ...base, phase: 'OFFER' }, walkOnly)).toBe('IDLE');
   expect(ballDogPose(base, walkOnly)).toBeNull();
+});
+
+test('the mouth follows the dog\'s drawn size', () => {
+  const dog = { x: 100, y: 100 };
+  expect(mouthPoint(dog, 'RIGHT')).toEqual({ x: 117, y: 83 });
+  const small = mouthPoint(dog, 'RIGHT', 27 / 44);
+  expect(small.x).toBeCloseTo(100 + 17 * (27 / 44));
+  expect(small.y).toBeCloseTo(100 - 17 * (27 / 44));
 });
