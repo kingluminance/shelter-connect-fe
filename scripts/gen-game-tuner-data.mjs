@@ -20,7 +20,11 @@ const ratio = (source, name, fallback) => {
 
 const offset = game.match(/const PLAYER_SPRITE_OFFSET = \{ x: (-?[0-9.]+), y: (-?[0-9.]+) \}/);
 
+const dogOffset = game.match(/const DOG_SPRITE_OFFSET = \{ x: (-?[0-9.]+), y: (-?[0-9.]+) \}/);
+
 const constants = {
+  dogSpriteOffsetX: dogOffset ? Number(dogOffset[1]) : 0,
+  dogSpriteOffsetY: dogOffset ? Number(dogOffset[2]) : 0,
   playerSpriteOffsetX: offset ? Number(offset[1]) : 0,
   playerSpriteOffsetY: offset ? Number(offset[2]) : 0,
   dogDisplaySize: num(game, 'DOG_DISPLAY_SIZE', 44),

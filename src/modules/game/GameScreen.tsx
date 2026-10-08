@@ -46,6 +46,9 @@ import { useShelterDogs, type DogWithBehavior } from '../dog/hooks/useShelterDog
 import type { RootStackParamList } from '../../app/navigation';
 
 const DOG_DISPLAY_SIZE = 44;
+// Where the dog sprite is drawn relative to the dog's ground point (map units, +x right / +y down).
+// Tuned with tools/game-tuner (docs/game-tuner.md).
+const DOG_SPRITE_OFFSET = { x: 0, y: 0 };
 // The player-vs-dog collision box (below) needs to roughly match what's actually drawn,
 // not `dogStateMachine.ts`'s DOG_RADIUS=8 — that one sizes the dog's own path-finding
 // around static obstacles and was never tied to DOG_DISPLAY_SIZE. Tuned by eye on-device
@@ -419,8 +422,8 @@ export function GameScreen() {
           direction={facing}
           envAnimFrame={animFrame}
           identity={identity}
-          groundX={toScreenX(dog.x)}
-          groundY={toScreenY(dog.y)}
+          groundX={toScreenX(dog.x + DOG_SPRITE_OFFSET.x)}
+          groundY={toScreenY(dog.y + DOG_SPRITE_OFFSET.y)}
           size={DOG_DISPLAY_SIZE * scale}
         />
       ),

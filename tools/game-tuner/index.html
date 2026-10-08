@@ -66,7 +66,7 @@
       <span><i style="background:#ffb86b"></i>플레이어 충돌</span>
       <span><i style="background:#6ea8ff"></i>강아지 이동 충돌</span>
     </div>
-    <div class="hint">강아지(발 위치)와 플레이어를 <b>드래그</b>해서 옮기고, 사람의 주황 원은 <b>가운데 마름모(위치)·오른쪽 점(크기)</b>을 끌어 조절하고, 빨간 사각형은 클릭해서 <b>이동·모서리 드래그로 크기</b> 조절, <kbd>Delete</kbd>로 삭제, 방향키로 1칸씩 이동. 마우스 휠 = 확대/축소, 빈 곳 드래그 = 화면 이동.</div>
+    <div class="hint">강아지(발 위치)와 플레이어를 <b>드래그</b>해서 옮기고, 사람의 주황 원은 <b>가운데 마름모(위치)·오른쪽 점(크기)</b>을 끌어 조절하고, <b>보라(강아지)·분홍(사람) 점선 상자</b>의 왼쪽 위 ✥ 를 끌면 <b>그림 위치</b>, 오른쪽 아래 네모를 끌면 <b>그림 크기</b>가 바뀌고, 빨간 사각형은 클릭해서 <b>이동·모서리 드래그로 크기</b> 조절, <kbd>Delete</kbd>로 삭제, 방향키로 1칸씩 이동. 마우스 휠 = 확대/축소, 빈 곳 드래그 = 화면 이동.</div>
 
     <h2>스프라이트 · 충돌 값 (GameScreen.tsx)</h2>
     <div id="sliders"></div>
@@ -122,7 +122,7 @@
     facing: 'DOWN',
     sel: -1, snap: 2, mode: 'select',
     view: { z: 1.4, ox: 0, oy: 0 },
-    layers: saved?.layers || { props: true, obst: true, bounds: true, coll: true, rings: true, viewport: false, slots: false },
+    layers: saved?.layers || { props: true, obst: true, bounds: true, coll: true, rings: true, viewport: false, slots: false, sprites: true },
     history: [],
   };
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify({ c: S.c, obstacles: S.obstacles, dog: S.dog, player: S.player, layers: S.layers })); } catch {} };
@@ -162,7 +162,7 @@
     const sheet = S.facing === 'UP' ? IM.dogUp : S.facing === 'DOWN' ? IM.dogDown : IM.dogSide;
     if (!sheet.complete || !sheet.naturalWidth) return;
     ctx.save();
-    ctx.translate(S.dog.x, S.dog.y);
+    ctx.translate(S.dog.x + c.dogSpriteOffsetX, S.dog.y + c.dogSpriteOffsetY);
     if (S.facing === 'LEFT') ctx.scale(-1, 1);
     ctx.drawImage(sheet, 0, 0, 64, 64, -32 * scale, -60 * scale, size, size);
     ctx.restore();
@@ -171,6 +171,24 @@
     if (!IM.player.complete || !IM.player.naturalWidth) return;
     const size = c.playerDisplaySize;
     ctx.drawImage(IM.player, 0, 0, 24, 24, S.player.x + c.playerSpriteOffsetX - size / 2, S.player.y + c.playerSpriteOffsetY - size / 2, size, size);
+  }
+  // 스프라이트가 그려지는 상자 (강아지는 발 기준점 = 상자 가운데 아래쪽 60/64 지점)
+  function spriteBox(who) {
+    const c = S.c;
+    if (who === 'dog') { const size = c.dogDisplaySize, ax = S.dog.x + c.dogSpriteOffsetX, ay = S.dog.y + c.dogSpriteOffsetY; return { left: ax - size / 2, top: ay - size * 60 / 64, size, ax, ay }; }
+    const size = c.playerDisplaySize, ax = S.player.x + c.playerSpriteOffsetX, ay = S.player.y + c.playerSpriteOffsetY;
+    return { left: ax - size / 2, top: ay - size / 2, size, ax, ay };
+  }
+  function drawSpriteBoxes() {
+    ['dog', 'player'].forEach(who => {
+      const b = spriteBox(who), hs = 5 / S.view.z, color = who === 'dog' ? '#c4b5fd' : '#fda4af';
+      ctx.strokeStyle = color; ctx.lineWidth = 1.2 / S.view.z; ctx.setLineDash([4 / S.view.z, 3 / S.view.z]); ctx.strokeRect(b.left, b.top, b.size, b.size); ctx.setLineDash([]);
+      ctx.fillStyle = '#1e2230'; ctx.strokeStyle = color; ctx.lineWidth = 1.4 / S.view.z;
+      ctx.beginPath(); ctx.arc(b.left, b.top, hs * 1.3, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); // 이동 손잡이(왼쪽 위)
+      ctx.save(); ctx.font = `${hs * 2.2}px sans-serif`; ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('✥', b.left, b.top + 0.5 / S.view.z); ctx.restore();
+      ctx.fillStyle = color; ctx.fillRect(b.left + b.size - hs, b.top + b.size - hs, hs * 2, hs * 2); // 크기 손잡이(오른쪽 아래)
+      label(who === 'dog' ? '강아지 그림' : '사람 그림', b.left + 4 / S.view.z, b.top - 4 / S.view.z, color);
+    });
   }
   function circle(x, y, r, stroke, dash, fill) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -200,6 +218,7 @@
       if (o) handles(o).forEach(h => { ctx.fillStyle = '#fff'; ctx.strokeStyle = '#d33'; ctx.lineWidth = 1 / S.view.z; const s = 5 / S.view.z; ctx.fillRect(h.x - s, h.y - s, s * 2, s * 2); ctx.strokeRect(h.x - s, h.y - s, s * 2, s * 2); });
     }
     if (S.layers.slots) { D.layout.slots.forEach((s, i) => { circle(s.x, s.y, 3, '#ffe066'); label('슬롯' + (i + 1), s.x + 5, s.y - 4, '#ffe066'); }); circle(D.layout.spawn.x, D.layout.spawn.y, 4, '#7dffb2'); label('스폰', D.layout.spawn.x + 6, D.layout.spawn.y - 4, '#7dffb2'); }
+    if (S.layers.sprites) drawSpriteBoxes();
     if (S.layers.coll) {
       const b = dogBlock();
       ctx.fillStyle = '#4ade8055'; ctx.fillRect(b.rect.x, b.rect.y, b.rect.w, b.rect.h);
@@ -247,7 +266,15 @@
       const dc = Math.hypot(p.x - S.player.x, p.y - S.player.y), dr = Math.hypot(p.x - (S.player.x + S.c.playerRadius), p.y - S.player.y);
       if (Math.min(dc, dr) <= tol * 1.1) return { kind: dc <= dr ? 'pcenter' : 'pradius' };
     }
-    const dogBox = { x: S.dog.x - S.c.dogDisplaySize / 2, y: S.dog.y - S.c.dogDisplaySize * 0.95, w: S.c.dogDisplaySize, h: S.c.dogDisplaySize };
+    if (S.layers.sprites) {
+      for (const who of ['player', 'dog']) {
+        const b = spriteBox(who);
+        if (near({ x: b.left + b.size, y: b.top + b.size }, p, tol * 1.2)) return { kind: 'sresize', who };
+        if (near({ x: b.left, y: b.top }, p, tol * 1.2)) return { kind: 'smove', who };
+      }
+    }
+    const db = spriteBox('dog');
+    const dogBox = { x: db.left, y: db.top, w: db.size, h: db.size };
     if (p.x >= dogBox.x && p.x <= dogBox.x + dogBox.w && p.y >= dogBox.y && p.y <= dogBox.y + dogBox.h) return { kind: 'dog' };
     const ps = S.c.playerDisplaySize;
     if (Math.abs(p.x - (S.player.x + S.c.playerSpriteOffsetX)) <= ps / 2 && Math.abs(p.y - (S.player.y + S.c.playerSpriteOffsetY)) <= ps / 2) return { kind: 'player' };
@@ -267,6 +294,8 @@
     if (h.kind === 'handle') { pushHistory(); drag = { kind: 'handle', name: h.name, orig: { ...S.obstacles[S.sel] } }; return; }
     if (h.kind === 'dog') { pushHistory(); drag = { kind: 'dog', dx: S.dog.x - p.x, dy: S.dog.y - p.y }; return; }
     if (h.kind === 'player') { pushHistory(); drag = { kind: 'player', dx: S.player.x - p.x, dy: S.player.y - p.y }; return; }
+    if (h.kind === 'smove') { pushHistory(); const k = h.who === 'dog' ? 'dogSprite' : 'playerSprite'; drag = { kind: 'smove', who: h.who, key: k, start: p, ox: S.c[k + 'OffsetX'], oy: S.c[k + 'OffsetY'] }; return; }
+    if (h.kind === 'sresize') { pushHistory(); drag = { kind: 'sresize', who: h.who }; return; }
     if (h.kind === 'pradius') { pushHistory(); drag = { kind: 'pradius' }; return; }
     if (h.kind === 'pcenter') { pushHistory(); drag = { kind: 'pcenter', sx: S.player.x + S.c.playerSpriteOffsetX, sy: S.player.y + S.c.playerSpriteOffsetY }; return; }
     if (h.kind === 'obstacle') { S.sel = h.index; pushHistory(); drag = { kind: 'move', dx: S.obstacles[h.index].x - p.x, dy: S.obstacles[h.index].y - p.y }; refreshObst(); draw(); return; }
@@ -280,6 +309,8 @@
     if (drag.kind === 'pan') { S.view.ox = drag.ox + (sx - drag.sx); S.view.oy = drag.oy + (sy - drag.sy); }
     else if (drag.kind === 'dog') { S.dog = { x: Math.round(p.x + drag.dx), y: Math.round(p.y + drag.dy) }; }
     else if (drag.kind === 'player') { S.player = { x: Math.round(p.x + drag.dx), y: Math.round(p.y + drag.dy) }; }
+    else if (drag.kind === 'smove') { const half = v => Math.round(v * 2) / 2; S.c[drag.key + 'OffsetX'] = half(drag.ox + (p.x - drag.start.x)); S.c[drag.key + 'OffsetY'] = half(drag.oy + (p.y - drag.start.y)); syncSlider(drag.key + 'OffsetX'); syncSlider(drag.key + 'OffsetY'); }
+    else if (drag.kind === 'sresize') { const b = spriteBox(drag.who), key = drag.who === 'dog' ? 'dogDisplaySize' : 'playerDisplaySize'; S.c[key] = Math.min(240, Math.max(10, Math.round(2 * (p.x - b.ax)))); syncSlider(key); }
     else if (drag.kind === 'pradius') { S.c.playerRadius = Math.min(60, Math.max(1, Math.round(Math.hypot(p.x - S.player.x, p.y - S.player.y) * 2) / 2)); syncSlider('playerRadius'); }
     else if (drag.kind === 'pcenter') { S.player = { x: Math.round(p.x), y: Math.round(p.y) }; S.c.playerSpriteOffsetX = drag.sx - S.player.x; S.c.playerSpriteOffsetY = drag.sy - S.player.y; syncSlider('playerSpriteOffsetX'); syncSlider('playerSpriteOffsetY'); }
     else if (drag.kind === 'move') { const o = S.obstacles[S.sel]; o.x = snap(p.x + drag.dx); o.y = snap(p.y + drag.dy); refreshObst(); }
@@ -339,6 +370,8 @@
   // ---- UI --------------------------------------------------------------------------------------------
   const SPEC = [
     ['dogDisplaySize', '강아지 크기', 20, 120, 1, '그려지는 크기(맵 단위). 클수록 큼'],
+    ['dogSpriteOffsetX', '강아지 그림 위치 ← →', -40, 40, 0.5, '발 기준점에서 그림을 옮겨 그리는 정도(맵 단위)'],
+    ['dogSpriteOffsetY', '강아지 그림 위치 ↑ ↓', -40, 40, 0.5, '+는 그림이 아래로'],
     ['dogCollisionRadiusRatio', '강아지 충돌 반지름 비율', 0.05, 0.5, 0.01, '× 강아지 크기 → 플레이어를 막는 초록 사각형의 반 변'],
     ['dogCollisionYOffsetRatio', '강아지 충돌 높이 비율', 0, 1.2, 0.01, '× 강아지 크기 → 발에서 위로 올려 몸통에 맞춤'],
     ['playerDisplaySize', '플레이어 크기', 24, 120, 1, '그려지는 크기'],
@@ -365,7 +398,7 @@
     range.addEventListener('input', () => set(range.value)); num.addEventListener('input', () => set(num.value));
     sliders.appendChild(row);
   });
-  const layerNames = { props: '소품 그림', obst: '맵 충돌(빨강)', bounds: '이동 경계', coll: '캐릭터 충돌', rings: '거리 원', viewport: '폰 화면 범위', slots: '강아지 슬롯·스폰' };
+  const layerNames = { sprites: '스프라이트 상자·손잡이', props: '소품 그림', obst: '맵 충돌(빨강)', bounds: '이동 경계', coll: '캐릭터 충돌', rings: '거리 원', viewport: '폰 화면 범위', slots: '강아지 슬롯·스폰' };
   Object.entries(layerNames).forEach(([k, name]) => {
     const l = document.createElement('label'); l.innerHTML = `<input type="checkbox" ${S.layers[k] ? 'checked' : ''}> ${name}`;
     l.querySelector('input').addEventListener('change', e => { S.layers[k] = e.target.checked; persist(); draw(); });
@@ -399,6 +432,7 @@
     return [
       '// src/modules/game/GameScreen.tsx',
       `const DOG_DISPLAY_SIZE = ${fmt(c.dogDisplaySize)};`,
+      `const DOG_SPRITE_OFFSET = { x: ${fmt(c.dogSpriteOffsetX)}, y: ${fmt(c.dogSpriteOffsetY)} };`,
       `const DOG_COLLISION_RADIUS = DOG_DISPLAY_SIZE * ${fmt(c.dogCollisionRadiusRatio)};`,
       `const DOG_COLLISION_Y_OFFSET = DOG_DISPLAY_SIZE * ${fmt(c.dogCollisionYOffsetRatio)};`,
       `const PLAYER_RADIUS = ${fmt(c.playerRadius)};`,
