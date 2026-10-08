@@ -46,6 +46,9 @@ import { useShelterDogs, type DogWithBehavior } from '../dog/hooks/useShelterDog
 import type { RootStackParamList } from '../../app/navigation';
 
 const DOG_DISPLAY_SIZE = 44;
+// Where the dog sprite is drawn relative to the dog's ground point (map units, +x right / +y down).
+// Tuned with tools/game-tuner (docs/game-tuner.md).
+const DOG_SPRITE_OFFSET = { x: 0, y: 0 };
 // The player-vs-dog collision box (below) needs to roughly match what's actually drawn,
 // not `dogStateMachine.ts`'s DOG_RADIUS=8 — that one sizes the dog's own path-finding
 // around static obstacles and was never tied to DOG_DISPLAY_SIZE. Tuned by eye on-device
@@ -53,12 +56,15 @@ const DOG_DISPLAY_SIZE = 44;
 // transparent padding) and centered well above dog.y (the ground/foot anchor, not the
 // visual middle of the dog).
 const DOG_COLLISION_RADIUS = DOG_DISPLAY_SIZE * 0.18;
-const DOG_COLLISION_Y_OFFSET = DOG_DISPLAY_SIZE * 0.85;
+const DOG_COLLISION_Y_OFFSET = DOG_DISPLAY_SIZE * 0.22;
 // Pixel art, nearest-neighbor only — no blur from bilinear interpolation on upscale.
 const NEAREST_SAMPLING = { filter: FilterMode.Nearest };
 
 const PLAYER_RADIUS = 10;
 const PLAYER_DISPLAY_SIZE = 64;
+// How far the player sprite is drawn from the collision circle's center (map units, +x right / +y down) —
+// the circle (PLAYER_RADIUS) is where the player really stands. Tuned with tools/game-tuner (docs/game-tuner.md).
+const PLAYER_SPRITE_OFFSET = { x: 0.5, y: -19 };
 const PLAYER_SPEED = 55; // px/s of map space
 const RUN_MULTIPLIER = 1.8;
 // How many map units are visible across the viewport's width — smaller = more zoomed in.
@@ -78,7 +84,8 @@ const PLAYER_WALK_SEQUENCE = [0, 1, 2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1];
 const TALK_RANGE = 40;
 // One prototype "pixel" of the ball, in map units (the prototype's dog is ~30px, ours 44 units).
 const BALL_PIXEL = 1.5;
-// The player's hand while holding / receiving the ball, relative to the player's center.
+// The player's hand while holding / receiving the ball, relative to the drawn sprite's center
+// (collision circle center + PLAYER_SPRITE_OFFSET).
 const HAND_OFFSET = { x: 14, y: -2 };
 
 function clamp(value: number, min: number, max: number) {
@@ -270,8 +277,8 @@ export function GameScreen() {
           // game is running (any phase but REST) tickDog just doesn't run, and it resumes where it
           // left off afterwards. REST only watches for the player coming close.
           const hand = {
-            x: playerPosRef.current.x + (facingLeft.current ? -HAND_OFFSET.x : HAND_OFFSET.x),
-            y: playerPosRef.current.y + HAND_OFFSET.y,
+            x: playerPosRef.current.x + PLAYER_SPRITE_OFFSET.x + (facingLeft.current ? -HAND_OFFSET.x : HAND_OFFSET.x),
+            y: playerPosRef.current.y + PLAYER_SPRITE_OFFSET.y + HAND_OFFSET.y,
           };
           const result = tickBallPlay(
             ball,
@@ -415,8 +422,8 @@ export function GameScreen() {
           direction={facing}
           envAnimFrame={animFrame}
           identity={identity}
-          groundX={toScreenX(dog.x)}
-          groundY={toScreenY(dog.y)}
+          groundX={toScreenX(dog.x + DOG_SPRITE_OFFSET.x)}
+          groundY={toScreenY(dog.y + DOG_SPRITE_OFFSET.y)}
           size={DOG_DISPLAY_SIZE * scale}
         />
       ),
@@ -508,8 +515,8 @@ export function GameScreen() {
     }
     const state = ballStatesRef.current[ballDogIndex];
     const hand = {
-      x: playerPosRef.current.x + (facingLeft.current ? -HAND_OFFSET.x : HAND_OFFSET.x),
-      y: playerPosRef.current.y + HAND_OFFSET.y,
+      x: playerPosRef.current.x + PLAYER_SPRITE_OFFSET.x + (facingLeft.current ? -HAND_OFFSET.x : HAND_OFFSET.x),
+      y: playerPosRef.current.y + PLAYER_SPRITE_OFFSET.y + HAND_OFFSET.y,
     };
     if (ballButton.action === 'receive') {
       ballStatesRef.current[ballDogIndex] = startReceive(state, { x: ballDog.x, y: ballDog.y }, dogFacingRef.current[ballDogIndex] ?? DEFAULT_DOG_FACING);
@@ -536,8 +543,8 @@ export function GameScreen() {
           frameSize={PLAYER_ACTION_CELL}
           col={frame}
           row={PLAYER_ACTION_ROW[gesture.playerAction]}
-          x={toScreenX(player.x) - size / 2}
-          y={toScreenY(player.y) + (PLAYER_DISPLAY_SIZE * scale) / 2 - size}
+          x={toScreenX(player.x + PLAYER_SPRITE_OFFSET.x) - size / 2}
+          y={toScreenY(player.y + PLAYER_SPRITE_OFFSET.y) + (PLAYER_DISPLAY_SIZE * scale) / 2 - size}
           size={size}
           flipX={facingLeft.current}
         />
@@ -553,8 +560,8 @@ export function GameScreen() {
           frameSize={PLAYER_FRAME_SIZE}
           col={playerFrame % PLAYER_SHEET_COLS}
           row={PLAYER_WALK_ROW}
-          x={toScreenX(player.x) - (PLAYER_DISPLAY_SIZE * scale) / 2}
-          y={toScreenY(player.y) - (PLAYER_DISPLAY_SIZE * scale) / 2}
+          x={toScreenX(player.x + PLAYER_SPRITE_OFFSET.x) - (PLAYER_DISPLAY_SIZE * scale) / 2}
+          y={toScreenY(player.y + PLAYER_SPRITE_OFFSET.y) - (PLAYER_DISPLAY_SIZE * scale) / 2}
           size={PLAYER_DISPLAY_SIZE * scale}
           flipX={facingLeft.current}
         />
