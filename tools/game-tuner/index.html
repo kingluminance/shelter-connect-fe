@@ -52,6 +52,8 @@
     <div id="hud">
       <button id="m-select" class="on" title="선택·이동·크기 조절">선택/이동</button>
       <button id="m-draw" title="드래그해서 새 충돌 사각형 추가">＋ 충돌 구역 그리기</button>
+      <button id="t-prop" class="on" title="소품(표지판·나무·집…)을 선택해 이동·크기 조절">대상: 소품</button>
+      <button id="t-obst" title="빨간 충돌 구역을 선택">대상: 충돌 구역</button>
       <button id="m-walk" title="WASD/방향키로 플레이어를 걸어 보며 충돌 확인 (Shift = 달리기)">▶ 걸어서 테스트</button>
       <button id="undo">↶ 되돌리기</button>
       <button id="fit">화면 맞추기</button>
@@ -66,10 +68,22 @@
       <span><i style="background:#ffb86b"></i>플레이어 충돌</span>
       <span><i style="background:#6ea8ff"></i>강아지 이동 충돌</span>
     </div>
-    <div class="hint">강아지(발 위치)와 플레이어를 <b>드래그</b>해서 옮기고, 사람의 주황 원은 <b>가운데 마름모(위치)·오른쪽 점(크기)</b>을 끌어 조절하고, <b>보라(강아지)·분홍(사람) 점선 상자</b>의 왼쪽 위 ✥ 를 끌면 <b>그림 위치</b>, 오른쪽 아래 네모를 끌면 <b>그림 크기</b>가 바뀌고, 빨간 사각형은 클릭해서 <b>이동·모서리 드래그로 크기</b> 조절, <kbd>Delete</kbd>로 삭제, 방향키로 1칸씩 이동. 마우스 휠 = 확대/축소, 빈 곳 드래그 = 화면 이동.</div>
+    <div class="hint">강아지(발 위치)와 플레이어를 <b>드래그</b>해서 옮기고, 사람의 주황 원은 <b>가운데 마름모(위치)·오른쪽 점(크기)</b>을 끌어 조절하고, <b>보라(강아지)·분홍(사람) 점선 상자</b>의 왼쪽 위 ✥ 를 끌면 <b>그림 위치</b>, 오른쪽 아래 네모를 끌면 <b>그림 크기</b>가 바뀌고, 빨간 사각형은 <b>위쪽 "대상: 충돌 구역"</b>으로 바꾼 뒤 클릭해서 <b>이동·모서리 드래그로 크기</b> 조절, 표지판·나무 같은 <b>소품은 "대상: 소품"</b> 상태에서 클릭해 이동·크기 조절, <kbd>Delete</kbd>로 삭제, 방향키로 1칸씩 이동. 마우스 휠 = 확대/축소, 빈 곳 드래그 = 화면 이동.</div>
 
     <h2>스프라이트 · 충돌 값 (GameScreen.tsx)</h2>
     <div id="sliders"></div>
+
+    <h2>선택한 소품 (표지판·나무·집…)</h2>
+    <div id="propInfo" class="hint">위쪽 "대상: 소품" 상태에서 그림을 클릭하세요. 모서리 네모를 끌면 크기(비율 유지, Shift=자유), 그림을 끌면 이동.</div>
+    <div class="obst" id="propFields" hidden>
+      <div><label>x</label><input id="px" type="number" step="1"></div>
+      <div><label>y</label><input id="py" type="number" step="1"></div>
+      <div><label>w</label><input id="pw" type="number" step="1"></div>
+      <div><label>h</label><input id="ph" type="number" step="1"></div>
+    </div>
+    <div class="checks" style="margin:6px 0"><label><input type="checkbox" id="moveContained" checked> 소품 안쪽의 충돌 구역도 같이 이동·확대</label></div>
+    <div class="btns"><button id="delProp">삭제</button><button id="dupProp">복제</button><button id="resetProp">원래 값으로</button></div>
+    <div class="btns"><select id="addAsset"></select><button id="addProp">＋ 소품 추가</button></div>
 
     <h2>선택한 충돌 구역</h2>
     <div id="obstInfo" class="hint">빨간 사각형을 클릭하세요.</div>
@@ -117,6 +131,8 @@
   const S = {
     c: { ...D.constants, ...(saved?.c || {}) },
     obstacles: clone(saved?.obstacles || D.layout.obstacles),
+    objects: clone(saved?.objects || D.layout.objects),
+    selProp: -1, target: 'prop', moveContained: true,
     dog: saved?.dog || { x: D.layout.slots[0].x, y: D.layout.slots[0].y },
     player: saved?.player || { x: D.layout.spawn.x - 40, y: D.layout.spawn.y },
     facing: 'DOWN',
@@ -125,14 +141,31 @@
     layers: saved?.layers || { props: true, obst: true, bounds: true, coll: true, rings: true, viewport: false, slots: false, sprites: true },
     history: [],
   };
-  const persist = () => { try { localStorage.setItem(KEY, JSON.stringify({ c: S.c, obstacles: S.obstacles, dog: S.dog, player: S.player, layers: S.layers })); } catch {} };
-  const pushHistory = () => { S.history.push(JSON.stringify({ o: S.obstacles, dog: S.dog, player: S.player })); if (S.history.length > 80) S.history.shift(); };
+  const persist = () => { try { localStorage.setItem(KEY, JSON.stringify({ c: S.c, obstacles: S.obstacles, objects: S.objects, dog: S.dog, player: S.player, layers: S.layers })); } catch {} };
+  const pushHistory = () => { S.history.push(JSON.stringify({ o: S.obstacles, ob: S.objects, dog: S.dog, player: S.player })); if (S.history.length > 80) S.history.shift(); };
 
   // ---- images ----------------------------------------------------------------
   const img = src => { const i = new Image(); i.onload = () => draw(); i.onerror = () => console.warn('이미지 로드 실패', src); i.src = src; return i; };
   const IM = { ground: img(D.assets.ground), dogDown: img(D.assets.dogDown), dogUp: img(D.assets.dogUp), dogSide: img(D.assets.dogSide), player: img(D.assets.player) };
   const propImgs = {};
   const propImg = name => propImgs[name] || (propImgs[name] = img(D.assets.propDir + name + '.png'));
+  // 소품의 depth(발 닿는 y)는 "아래쪽에서 얼마나 위인지" 비율이 소품마다 고정 — 옮기고 키워도 그 비율로 다시 계산
+  const depthRatio = {};
+  D.layout.objects.forEach(o => { depthRatio[o.id] = (o.y + o.h - o.depth) / o.h; });
+  const ratioOf = o => depthRatio[o.id] ?? (D.layout.objects.find(x => x.asset === o.asset) ? (depthRatio[D.layout.objects.find(x => x.asset === o.asset).id]) : 0.1);
+  const fixDepth = o => { o.depth = Math.round(o.y + o.h - ratioOf(o) * o.h); };
+  // 투명한 부분은 클릭이 통과하도록 알파값 검사 (file:// 로 열어 캔버스가 막히면 상자 판정으로 대체)
+  const alphaCache = {};
+  function opaqueAt(o, p) {
+    const im = propImg(o.asset);
+    if (!im.complete || !im.naturalWidth) return true;
+    try {
+      const c = alphaCache[o.asset] || (alphaCache[o.asset] = (() => { const cc = document.createElement('canvas'); cc.width = im.naturalWidth; cc.height = im.naturalHeight; const x = cc.getContext('2d'); x.drawImage(im, 0, 0); return { x, w: cc.width, h: cc.height }; })());
+      const ix = Math.floor((p.x - o.x) / o.w * c.w), iy = Math.floor((p.y - o.y) / o.h * c.h);
+      return c.x.getImageData(Math.min(c.w - 1, Math.max(0, ix)), Math.min(c.h - 1, Math.max(0, iy)), 1, 1).data[3] > 20;
+    } catch { return true; }
+  }
+  const containedObstacles = box => S.obstacles.map((r, i) => ({ i, r })).filter(({ r }) => r.x + r.w / 2 >= box.x && r.x + r.w / 2 <= box.x + box.w && r.y + r.h / 2 >= box.y && r.y + r.h / 2 <= box.y + box.h);
 
   // ---- the game's own movement rule (core/systems/movement.ts) ------------------
   const circleHitsRect = (cx, cy, r, o) => { const x = Math.max(o.x, Math.min(cx, o.x + o.w)), y = Math.max(o.y, Math.min(cy, o.y + o.h)); const dx = cx - x, dy = cy - y; return dx * dx + dy * dy < r * r; };
@@ -190,6 +223,15 @@
       label(who === 'dog' ? '강아지 그림' : '사람 그림', b.left + 4 / S.view.z, b.top - 4 / S.view.z, color);
     });
   }
+  function propHandles(o) { return [['nw', o.x, o.y], ['ne', o.x + o.w, o.y], ['sw', o.x, o.y + o.h], ['se', o.x + o.w, o.y + o.h]].map(([name, x, y]) => ({ name, x, y })); }
+  function drawPropSelection() {
+    const o = S.objects[S.selProp]; if (!o) return;
+    ctx.strokeStyle = '#fde047'; ctx.lineWidth = 1.4 / S.view.z; ctx.setLineDash([5 / S.view.z, 3 / S.view.z]); ctx.strokeRect(o.x, o.y, o.w, o.h); ctx.setLineDash([]);
+    if (S.moveContained) containedObstacles(o).forEach(({ r }) => { ctx.strokeStyle = '#fde047'; ctx.lineWidth = 1.6 / S.view.z; ctx.strokeRect(r.x, r.y, r.w, r.h); });
+    const hs = 5 / S.view.z;
+    propHandles(o).forEach(h => { ctx.fillStyle = '#fde047'; ctx.strokeStyle = '#854d0e'; ctx.lineWidth = 1 / S.view.z; ctx.fillRect(h.x - hs, h.y - hs, hs * 2, hs * 2); ctx.strokeRect(h.x - hs, h.y - hs, hs * 2, hs * 2); });
+    label(`${o.name} · ${o.asset}`, o.x + 3 / S.view.z, o.y - 4 / S.view.z, '#fde047');
+  }
   function circle(x, y, r, stroke, dash, fill) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
     if (fill) { ctx.fillStyle = fill; ctx.fill(); }
@@ -207,7 +249,7 @@
 
     if (IM.ground.complete) ctx.drawImage(IM.ground, 0, 0, 640, 640);
     const list = [];
-    if (S.layers.props) D.layout.objects.forEach(o => list.push({ depth: o.depth, draw: () => { const im = propImg(o.asset); if (im.complete && im.naturalWidth) ctx.drawImage(im, o.x, o.y, o.w, o.h); } }));
+    if (S.layers.props) S.objects.forEach(o => list.push({ depth: o.depth, draw: () => { const im = propImg(o.asset); if (im.complete && im.naturalWidth) ctx.drawImage(im, o.x, o.y, o.w, o.h); } }));
     list.push({ depth: S.dog.y, draw: () => drawDog(c) }, { depth: S.player.y, draw: () => drawPlayer(c) });
     list.sort((a, b) => a.depth - b.depth).forEach(e => e.draw());
 
@@ -218,6 +260,7 @@
       if (o) handles(o).forEach(h => { ctx.fillStyle = '#fff'; ctx.strokeStyle = '#d33'; ctx.lineWidth = 1 / S.view.z; const s = 5 / S.view.z; ctx.fillRect(h.x - s, h.y - s, s * 2, s * 2); ctx.strokeRect(h.x - s, h.y - s, s * 2, s * 2); });
     }
     if (S.layers.slots) { D.layout.slots.forEach((s, i) => { circle(s.x, s.y, 3, '#ffe066'); label('슬롯' + (i + 1), s.x + 5, s.y - 4, '#ffe066'); }); circle(D.layout.spawn.x, D.layout.spawn.y, 4, '#7dffb2'); label('스폰', D.layout.spawn.x + 6, D.layout.spawn.y - 4, '#7dffb2'); }
+    drawPropSelection();
     if (S.layers.sprites) drawSpriteBoxes();
     if (S.layers.coll) {
       const b = dogBlock();
@@ -259,6 +302,8 @@
   const near = (a, b, r) => Math.abs(a.x - b.x) <= r && Math.abs(a.y - b.y) <= r;
   function hit(p) {
     const tol = 8 / S.view.z;
+    const sp = S.objects[S.selProp];
+    if (sp && S.target === 'prop') { const h = propHandles(sp).find(h => near(h, p, tol * 1.2)); if (h) return { kind: 'phandle', name: h.name }; }
     const o = S.obstacles[S.sel];
     if (o && S.layers.obst) { const h = handles(o).find(h => near(h, p, tol)); if (h) return { kind: 'handle', name: h.name }; }
     if (S.layers.coll) {
@@ -278,7 +323,11 @@
     if (p.x >= dogBox.x && p.x <= dogBox.x + dogBox.w && p.y >= dogBox.y && p.y <= dogBox.y + dogBox.h) return { kind: 'dog' };
     const ps = S.c.playerDisplaySize;
     if (Math.abs(p.x - (S.player.x + S.c.playerSpriteOffsetX)) <= ps / 2 && Math.abs(p.y - (S.player.y + S.c.playerSpriteOffsetY)) <= ps / 2) return { kind: 'player' };
-    if (S.layers.obst) for (let i = S.obstacles.length - 1; i >= 0; i--) { const r = S.obstacles[i]; if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) return { kind: 'obstacle', index: i }; }
+    if (S.target === 'prop' && S.layers.props) {
+      const order = S.objects.map((o, i) => ({ o, i })).sort((a, b) => b.o.depth - a.o.depth);
+      for (const { o, i } of order) if (p.x >= o.x && p.x <= o.x + o.w && p.y >= o.y && p.y <= o.y + o.h && opaqueAt(o, p)) return { kind: 'prop', index: i };
+    }
+    if (S.target === 'obst' && S.layers.obst) for (let i = S.obstacles.length - 1; i >= 0; i--) { const r = S.obstacles[i]; if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) return { kind: 'obstacle', index: i }; }
     return { kind: 'bg' };
   }
   const snap = v => Math.round(v / S.snap) * S.snap;
@@ -298,8 +347,10 @@
     if (h.kind === 'sresize') { pushHistory(); drag = { kind: 'sresize', who: h.who }; return; }
     if (h.kind === 'pradius') { pushHistory(); drag = { kind: 'pradius' }; return; }
     if (h.kind === 'pcenter') { pushHistory(); drag = { kind: 'pcenter', sx: S.player.x + S.c.playerSpriteOffsetX, sy: S.player.y + S.c.playerSpriteOffsetY }; return; }
-    if (h.kind === 'obstacle') { S.sel = h.index; pushHistory(); drag = { kind: 'move', dx: S.obstacles[h.index].x - p.x, dy: S.obstacles[h.index].y - p.y }; refreshObst(); draw(); return; }
-    S.sel = -1; refreshObst();
+    if (h.kind === 'phandle') { pushHistory(); const o = S.objects[S.selProp], g = { x: o.x, y: o.y, w: o.w, h: o.h }; drag = { kind: 'presize', name: h.name, orig: g, contained: S.moveContained ? containedObstacles(g).map(({ i, r }) => ({ i, r: { ...r } })) : [] }; return; }
+    if (h.kind === 'prop') { S.selProp = h.index; S.sel = -1; pushHistory(); const o = S.objects[h.index], g = { x: o.x, y: o.y, w: o.w, h: o.h }; drag = { kind: 'pmove', dx: o.x - p.x, dy: o.y - p.y, orig: g, contained: S.moveContained ? containedObstacles(g).map(({ i, r }) => ({ i, r: { ...r } })) : [] }; refreshObst(); refreshProp(); draw(); return; }
+    if (h.kind === 'obstacle') { S.sel = h.index; S.selProp = -1; refreshProp(); pushHistory(); drag = { kind: 'move', dx: S.obstacles[h.index].x - p.x, dy: S.obstacles[h.index].y - p.y }; refreshObst(); draw(); return; }
+    S.sel = -1; S.selProp = -1; refreshObst(); refreshProp();
     drag = { kind: 'pan', sx, sy, ox: S.view.ox, oy: S.view.oy }; draw();
   });
   cv.addEventListener('pointermove', e => {
@@ -313,6 +364,17 @@
     else if (drag.kind === 'sresize') { const b = spriteBox(drag.who), key = drag.who === 'dog' ? 'dogDisplaySize' : 'playerDisplaySize'; S.c[key] = Math.min(240, Math.max(10, Math.round(2 * (p.x - b.ax)))); syncSlider(key); }
     else if (drag.kind === 'pradius') { S.c.playerRadius = Math.min(60, Math.max(1, Math.round(Math.hypot(p.x - S.player.x, p.y - S.player.y) * 2) / 2)); syncSlider('playerRadius'); }
     else if (drag.kind === 'pcenter') { S.player = { x: Math.round(p.x), y: Math.round(p.y) }; S.c.playerSpriteOffsetX = drag.sx - S.player.x; S.c.playerSpriteOffsetY = drag.sy - S.player.y; syncSlider('playerSpriteOffsetX'); syncSlider('playerSpriteOffsetY'); }
+    else if (drag.kind === 'pmove') {
+      const o = S.objects[S.selProp]; o.x = snap(p.x + drag.dx); o.y = snap(p.y + drag.dy); fixDepth(o);
+      const dx = o.x - drag.orig.x, dy = o.y - drag.orig.y; drag.contained.forEach(({ i, r }) => { S.obstacles[i].x = r.x + dx; S.obstacles[i].y = r.y + dy; }); refreshProp();
+    }
+    else if (drag.kind === 'presize') {
+      const o = S.objects[S.selProp], g = drag.orig, n = drag.name, X = snap(p.x), Y = snap(p.y);
+      const ax = n.includes('w') ? g.x + g.w : g.x, ay = n.includes('n') ? g.y + g.h : g.y;
+      const w = Math.max(S.snap * 2, Math.abs(X - ax)), h = e.shiftKey ? Math.max(S.snap * 2, Math.abs(Y - ay)) : Math.max(S.snap * 2, Math.round(w * g.h / g.w));
+      o.w = w; o.h = h; o.x = n.includes('w') ? ax - w : ax; o.y = n.includes('n') ? ay - h : ay; fixDepth(o);
+      const sx = o.w / g.w, sy = o.h / g.h; drag.contained.forEach(({ i, r }) => { Object.assign(S.obstacles[i], { x: Math.round(o.x + (r.x - g.x) * sx), y: Math.round(o.y + (r.y - g.y) * sy), w: Math.max(1, Math.round(r.w * sx)), h: Math.max(1, Math.round(r.h * sy)) }); }); refreshProp();
+    }
     else if (drag.kind === 'move') { const o = S.obstacles[S.sel]; o.x = snap(p.x + drag.dx); o.y = snap(p.y + drag.dy); refreshObst(); }
     else if (drag.kind === 'draw') { const a = drag.start, b = { x: snap(p.x), y: snap(p.y) }; drag.rect = { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(a.x - b.x), h: Math.abs(a.y - b.y) }; }
     else if (drag.kind === 'handle') {
@@ -325,7 +387,7 @@
     draw(); outputs();
   });
   const end = () => {
-    if (drag?.kind === 'draw' && drag.rect && drag.rect.w >= 2 && drag.rect.h >= 2) { S.obstacles.push(drag.rect); S.sel = S.obstacles.length - 1; setMode('select'); refreshObst(); }
+    if (drag?.kind === 'draw' && drag.rect && drag.rect.w >= 2 && drag.rect.h >= 2) { S.obstacles.push(drag.rect); S.sel = S.obstacles.length - 1; setMode('select'); setTarget('obst'); refreshObst(); }
     drag = null; persist(); outputs(); draw();
   };
   cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
@@ -342,9 +404,11 @@
     if (e.target.matches?.('input,textarea,select')) return;
     keys.add(e.code);
     if (S.mode === 'walk') { if (e.code.startsWith('Arrow')) e.preventDefault(); return; }
+    if ((e.code === 'Delete' || e.code === 'Backspace') && S.selProp >= 0) { e.preventDefault(); delProp(); return; }
     if ((e.code === 'Delete' || e.code === 'Backspace') && S.sel >= 0) { e.preventDefault(); delSel(); }
     if ((e.metaKey || e.ctrlKey) && e.code === 'KeyZ') { e.preventDefault(); undo(); }
     const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.code];
+    if (d && S.selProp >= 0) { e.preventDefault(); pushHistory(); const o = S.objects[S.selProp]; o.x += d[0]; o.y += d[1]; fixDepth(o); if (S.moveContained) containedObstacles({ x: o.x - d[0], y: o.y - d[1], w: o.w, h: o.h }).forEach(({ i }) => { S.obstacles[i].x += d[0]; S.obstacles[i].y += d[1]; }); refreshProp(); persist(); outputs(); draw(); return; }
     if (d && S.sel >= 0) { e.preventDefault(); pushHistory(); const o = S.obstacles[S.sel]; o.x += d[0]; o.y += d[1]; refreshObst(); persist(); outputs(); draw(); }
   });
   window.addEventListener('keyup', e => keys.delete(e.code));
@@ -413,12 +477,34 @@
     draw();
   }
   $('m-select').onclick = () => setMode('select'); $('m-draw').onclick = () => setMode('draw'); $('m-walk').onclick = () => setMode('walk');
-  const undo = () => { const h = S.history.pop(); if (!h) return; const v = JSON.parse(h); S.obstacles = v.o; S.dog = v.dog; S.player = v.player; S.sel = -1; refreshObst(); persist(); outputs(); draw(); };
+  const undo = () => { const h = S.history.pop(); if (!h) return; const v = JSON.parse(h); S.obstacles = v.o; S.objects = v.ob || S.objects; S.dog = v.dog; S.player = v.player; S.sel = -1; S.selProp = -1; refreshObst(); refreshProp(); persist(); outputs(); draw(); };
   $('undo').onclick = undo; $('fit').onclick = fit;
   function delSel() { if (S.sel < 0) return; pushHistory(); S.obstacles.splice(S.sel, 1); S.sel = -1; refreshObst(); persist(); outputs(); draw(); }
   $('delObst').onclick = delSel;
   $('dupObst').onclick = () => { const o = S.obstacles[S.sel]; if (!o) return; pushHistory(); S.obstacles.push({ x: o.x + 8, y: o.y + 8, w: o.w, h: o.h }); S.sel = S.obstacles.length - 1; refreshObst(); persist(); outputs(); draw(); };
   ['x', 'y', 'w', 'h'].forEach(k => $('o' + k).addEventListener('input', e => { const o = S.obstacles[S.sel]; if (!o) return; o[k] = Number(e.target.value); persist(); outputs(); draw(); }));
+  function delProp() { if (S.selProp < 0) return; pushHistory(); S.objects.splice(S.selProp, 1); S.selProp = -1; refreshProp(); persist(); outputs(); draw(); }
+  function refreshProp() {
+    const o = S.objects[S.selProp];
+    $('propFields').hidden = !o;
+    $('propInfo').textContent = o ? `${o.name} · ${o.asset} (#${S.selProp + 1}/${S.objects.length}) — 깊이(그림 겹침 순서) ${o.depth}` : '위쪽 "대상: 소품" 상태에서 그림을 클릭하세요. 모서리 네모를 끌면 크기(비율 유지, Shift=자유), 그림을 끌면 이동.';
+    if (o) { $('px').value = o.x; $('py').value = o.y; $('pw').value = o.w; $('ph').value = o.h; }
+  }
+  $('delProp').onclick = delProp;
+  $('dupProp').onclick = () => { const o = S.objects[S.selProp]; if (!o) return; pushHistory(); const n = { ...o, x: o.x + 8, y: o.y + 8, id: 'object-' + String(Date.now()).slice(-6) }; fixDepth(n); S.objects.push(n); S.selProp = S.objects.length - 1; refreshProp(); persist(); outputs(); draw(); };
+  $('resetProp').onclick = () => { const o = S.objects[S.selProp], orig = o && D.layout.objects.find(x => x.id === o.id); if (!orig) return; pushHistory(); Object.assign(o, { x: orig.x, y: orig.y, w: orig.w, h: orig.h, depth: orig.depth }); refreshProp(); persist(); outputs(); draw(); };
+  ['x', 'y', 'w', 'h'].forEach(k => $('p' + k).addEventListener('input', e => { const o = S.objects[S.selProp]; if (!o) return; o[k] = Number(e.target.value); fixDepth(o); persist(); outputs(); draw(); }));
+  $('moveContained').addEventListener('change', e => { S.moveContained = e.target.checked; draw(); });
+  const assetNames = [...new Set(D.layout.objects.map(o => o.asset))].sort();
+  assetNames.forEach(n => { const op = document.createElement('option'); op.textContent = n; $('addAsset').appendChild(op); });
+  $('addProp').onclick = () => {
+    const asset = $('addAsset').value, tpl = D.layout.objects.find(o => o.asset === asset); if (!tpl) return;
+    pushHistory(); const c = toWorld(W / 2, H / 2);
+    const n = { name: tpl.name, x: Math.round(c.x - tpl.w / 2), y: Math.round(c.y - tpl.h / 2), depth: 0, sx: 0, sy: 0, w: tpl.w, h: tpl.h, id: 'object-' + String(Date.now()).slice(-6), asset, file: tpl.file };
+    fixDepth(n); S.objects.push(n); S.selProp = S.objects.length - 1; S.sel = -1; setTarget('prop'); refreshProp(); persist(); outputs(); draw();
+  };
+  function setTarget(t) { S.target = t; $('t-prop').classList.toggle('on', t === 'prop'); $('t-obst').classList.toggle('on', t === 'obst'); if (t === 'prop') { S.sel = -1; refreshObst(); } else { S.selProp = -1; refreshProp(); } draw(); }
+  $('t-prop').onclick = () => setTarget('prop'); $('t-obst').onclick = () => setTarget('obst');
   function refreshObst() {
     const o = S.obstacles[S.sel];
     $('obstFields').hidden = !o;
@@ -456,14 +542,15 @@
     $('codeOut').value = codeText();
     const orig = new Set(D.layout.obstacles.map(obstKey)), now = new Set(S.obstacles.map(obstKey));
     const added = [...now].filter(k => !orig.has(k)).length, removed = [...orig].filter(k => !now.has(k)).length;
-    $('diff').textContent = added || removed ? `원본 ${D.layout.obstacles.length}개 → 현재 ${S.obstacles.length}개 (새로/바뀐 ${added}, 사라진/바뀐 ${removed})` : `원본과 같아요 (${S.obstacles.length}개)`;
+    const objChanged = S.objects.length !== D.layout.objects.length || S.objects.some((o, i) => { const g = D.layout.objects[i]; return !g || o.id !== g.id || o.x !== g.x || o.y !== g.y || o.w !== g.w || o.h !== g.h; });
+    $('diff').textContent = (objChanged ? `소품 ${D.layout.objects.length}개 → ${S.objects.length}개 (위치·크기 변경 있음)  ·  ` : '소품은 원본과 같아요  ·  ') + (added || removed ? `충돌 구역 원본 ${D.layout.obstacles.length}개 → 현재 ${S.obstacles.length}개 (새로/바뀐 ${added}, 사라진/바뀐 ${removed})` : `충돌 구역은 원본과 같아요 (${S.obstacles.length}개)`);
     $('obstOut').value = JSON.stringify(S.obstacles);
   }
   const copy = (text, btn) => navigator.clipboard.writeText(text).then(() => { const t = btn.textContent; btn.textContent = '복사됨 ✓'; setTimeout(() => (btn.textContent = t), 1200); }, () => { btn.textContent = '복사 실패 — 아래 칸에서 직접 복사'; });
   $('copyCode').onclick = e => copy($('codeOut').value, e.target);
   $('copyObst').onclick = e => copy($('obstOut').value, e.target);
   $('dlLayout').onclick = () => {
-    const out = { ...D.layout, obstacles: S.obstacles };
+    const out = { ...D.layout, obstacles: S.obstacles, objects: S.objects };
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2) + '\n'], { type: 'application/json' })); a.download = 'layout.json'; a.click();
   };
   $('reset').onclick = () => {
