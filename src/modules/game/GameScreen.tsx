@@ -59,6 +59,9 @@ const NEAREST_SAMPLING = { filter: FilterMode.Nearest };
 
 const PLAYER_RADIUS = 10;
 const PLAYER_DISPLAY_SIZE = 64;
+// How far the player sprite is drawn from the collision circle's center (map units, +x right / +y down) —
+// the circle (PLAYER_RADIUS) is where the player really stands. Tuned with tools/game-tuner (docs/game-tuner.md).
+const PLAYER_SPRITE_OFFSET = { x: 0, y: 0 };
 const PLAYER_SPEED = 55; // px/s of map space
 const RUN_MULTIPLIER = 1.8;
 // How many map units are visible across the viewport's width — smaller = more zoomed in.
@@ -536,8 +539,8 @@ export function GameScreen() {
           frameSize={PLAYER_ACTION_CELL}
           col={frame}
           row={PLAYER_ACTION_ROW[gesture.playerAction]}
-          x={toScreenX(player.x) - size / 2}
-          y={toScreenY(player.y) + (PLAYER_DISPLAY_SIZE * scale) / 2 - size}
+          x={toScreenX(player.x + PLAYER_SPRITE_OFFSET.x) - size / 2}
+          y={toScreenY(player.y + PLAYER_SPRITE_OFFSET.y) + (PLAYER_DISPLAY_SIZE * scale) / 2 - size}
           size={size}
           flipX={facingLeft.current}
         />
@@ -553,8 +556,8 @@ export function GameScreen() {
           frameSize={PLAYER_FRAME_SIZE}
           col={playerFrame % PLAYER_SHEET_COLS}
           row={PLAYER_WALK_ROW}
-          x={toScreenX(player.x) - (PLAYER_DISPLAY_SIZE * scale) / 2}
-          y={toScreenY(player.y) - (PLAYER_DISPLAY_SIZE * scale) / 2}
+          x={toScreenX(player.x + PLAYER_SPRITE_OFFSET.x) - (PLAYER_DISPLAY_SIZE * scale) / 2}
+          y={toScreenY(player.y + PLAYER_SPRITE_OFFSET.y) - (PLAYER_DISPLAY_SIZE * scale) / 2}
           size={PLAYER_DISPLAY_SIZE * scale}
           flipX={facingLeft.current}
         />
