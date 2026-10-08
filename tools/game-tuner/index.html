@@ -113,6 +113,9 @@
     </div>
     <div class="hint">내려받은 <code>layout.json</code>을 <code>src/modules/game/core/assets/maps/01-sunny-meadow/map/</code> 의 같은 파일에 덮어쓰면 반영돼요.</div>
     <textarea id="obstOut" readonly></textarea>
+    <h2>바뀐 소품 (표지판·나무 등) — 이 칸을 통째로 복사</h2>
+    <div class="hint">위치·크기·깊이가 바뀐(또는 추가·삭제한) 소품만 자동으로 채워져요. 칸을 클릭하면 전체가 선택됩니다.</div>
+    <textarea id="propsOut" readonly></textarea>
   </div>
 </div>
 
@@ -546,18 +549,21 @@
     const objChanged = S.objects.length !== D.layout.objects.length || S.objects.some((o, i) => { const g = D.layout.objects[i]; return !g || o.id !== g.id || o.x !== g.x || o.y !== g.y || o.w !== g.w || o.h !== g.h; });
     $('diff').textContent = (objChanged ? `소품 ${D.layout.objects.length}개 → ${S.objects.length}개 (위치·크기 변경 있음)  ·  ` : '소품은 원본과 같아요  ·  ') + (added || removed ? `충돌 구역 원본 ${D.layout.obstacles.length}개 → 현재 ${S.obstacles.length}개 (새로/바뀐 ${added}, 사라진/바뀐 ${removed})` : `충돌 구역은 원본과 같아요 (${S.obstacles.length}개)`);
     $('obstOut').value = JSON.stringify(S.obstacles);
+    $('propsOut').value = propsChange();
   }
   const copy = (text, btn) => navigator.clipboard.writeText(text).then(() => { const t = btn.textContent; btn.textContent = '복사됨 ✓'; setTimeout(() => (btn.textContent = t), 1200); }, () => { btn.textContent = '복사 실패 — 아래 칸에서 직접 복사'; });
   $('copyCode').onclick = e => copy($('codeOut').value, e.target);
   $('copyObst').onclick = e => copy($('obstOut').value, e.target);
   // 바뀐 소품(위치·크기·깊이)만 추려서 — 채팅에 붙여 넣기 쉬운 크기
-  $('copyProps').onclick = e => {
+  function propsChange() {
     const orig = new Map(D.layout.objects.map(o => [o.id, o])), now = new Set(S.objects.map(o => o.id));
     const changed = S.objects.filter(o => { const g = orig.get(o.id); return g && (g.x !== o.x || g.y !== o.y || g.w !== o.w || g.h !== o.h || g.depth !== o.depth); }).map(o => ({ id: o.id, asset: o.asset, x: o.x, y: o.y, w: o.w, h: o.h, depth: o.depth }));
     const added = S.objects.filter(o => !orig.has(o.id));
     const removed = D.layout.objects.filter(o => !now.has(o.id)).map(o => o.id);
-    copy(JSON.stringify({ changed, added, removed }), e.target);
-  };
+    return JSON.stringify({ changed, added, removed });
+  }
+  $('copyProps').onclick = e => copy(propsChange(), e.target);
+  $('propsOut').addEventListener('focus', e => e.target.select());
   $('dlLayout').onclick = () => {
     const out = { ...D.layout, obstacles: S.obstacles, objects: S.objects };
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2) + '\n'], { type: 'application/json' })); a.download = 'layout.json'; a.click();
