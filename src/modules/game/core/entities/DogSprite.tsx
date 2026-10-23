@@ -10,7 +10,7 @@ import {
   dogWalkAtlas,
   dogWalkRow,
 } from '../assets/dog/dogWalkAtlas';
-import type { DogActionKey, DogAssetManifest, DogSpriteDirection } from '../../../dog/types';
+import type { DogActionKey, DogAssetClip, DogAssetManifest, DogSpriteDirection } from '../../../dog/types';
 
 interface DogSpriteProps {
   dog: DogAgent;
@@ -35,6 +35,32 @@ interface DogSpriteProps {
   groundX: number;
   groundY: number;
   size: number;
+}
+
+const ACTION_KEYS: DogActionKey[] = ['IDLE', 'WALK', 'RUN', 'SNIFF', 'TAIL_WAG', 'BACK_OFF', 'SIT', 'LIE_DOWN'];
+
+/** One action→clip set's sheets as url→image. Fixed-count useImage calls — rules of hooks
+ * forbid calling it per this dog's actual availableActions, which varies dog to dog;
+ * missing actions just get `undefined` and resolve to `null`. */
+function useClipSheets(clips: Partial<Record<DogActionKey, DogAssetClip>> | undefined): Record<string, SkImage | null> {
+  const images = [
+    useImage(clips?.IDLE?.spritesheetUrl),
+    useImage(clips?.WALK?.spritesheetUrl),
+    useImage(clips?.RUN?.spritesheetUrl),
+    useImage(clips?.SNIFF?.spritesheetUrl),
+    useImage(clips?.TAIL_WAG?.spritesheetUrl),
+    useImage(clips?.BACK_OFF?.spritesheetUrl),
+    useImage(clips?.SIT?.spritesheetUrl),
+    useImage(clips?.LIE_DOWN?.spritesheetUrl),
+  ];
+  const byUrl: Record<string, SkImage | null> = {};
+  ACTION_KEYS.forEach((key, i) => {
+    const url = clips?.[key]?.spritesheetUrl;
+    if (url) {
+      byUrl[url] = images[i];
+    }
+  });
+  return byUrl;
 }
 
 const PLACEHOLDER_DIRECTION: Record<DogSpriteDirection, { row: DogDirection; flipX: boolean }> = {
@@ -62,55 +88,27 @@ export function DogSprite({
   groundY,
   size,
 }: DogSpriteProps) {
-  // Fixed-count useImage calls (same reasoning as GameScreen.tsx's waterFrames array) —
-  // rules of hooks forbid calling it conditionally per this dog's actual availableActions,
-  // which varies dog to dog. Slots for actions/directions this dog doesn't have just get
-  // `undefined` and resolve to `null`.
-  const sheets: Partial<Record<DogActionKey, SkImage | null>> = {
-    IDLE: useImage(manifest?.animations.IDLE?.spritesheetUrl),
-    WALK: useImage(manifest?.animations.WALK?.spritesheetUrl),
-    RUN: useImage(manifest?.animations.RUN?.spritesheetUrl),
-    SNIFF: useImage(manifest?.animations.SNIFF?.spritesheetUrl),
-    TAIL_WAG: useImage(manifest?.animations.TAIL_WAG?.spritesheetUrl),
-    BACK_OFF: useImage(manifest?.animations.BACK_OFF?.spritesheetUrl),
-    SIT: useImage(manifest?.animations.SIT?.spritesheetUrl),
-    LIE_DOWN: useImage(manifest?.animations.LIE_DOWN?.spritesheetUrl),
+  // Every sheet this dog might draw, keyed by URL (unique per file within one manifest) —
+  // `selected` below may substitute a different action's art (RUN/BACK_OFF → WALK). RIGHT
+  // isn't loaded separately: it reuses `animations` 1:1 (types.ts).
+  const sheetsByUrl = {
+    ...useClipSheets(manifest?.animations),
+    ...useClipSheets(manifest?.mapDirections?.LEFT),
+    ...useClipSheets(manifest?.mapDirections?.UP),
+    ...useClipSheets(manifest?.mapDirections?.DOWN),
   };
-  // mapDirections currently only ever has IDLE/WALK for DOWN/UP (docs/map-dog-sprites.md) —
-  // fixed slots for just those, not a full 8-action×3-direction cross product that mostly
-  // wouldn't have real files behind it yet.
-  const downIdleSheet = useImage(manifest?.mapDirections?.DOWN?.IDLE?.spritesheetUrl);
-  const downWalkSheet = useImage(manifest?.mapDirections?.DOWN?.WALK?.spritesheetUrl);
-  const upIdleSheet = useImage(manifest?.mapDirections?.UP?.IDLE?.spritesheetUrl);
-  const upWalkSheet = useImage(manifest?.mapDirections?.UP?.WALK?.spritesheetUrl);
   const fallbackSheet = useImage(dogWalkAtlas);
 
   const state = renderStateOverride ?? dog.state;
   const selected = manifest ? selectDirectionalClip(manifest, state, direction) : null;
 
   if (manifest && selected) {
-    // Keyed by URL (unique per file within one manifest) rather than by action/direction,
-    // since `selected` may have substituted a different action's art (RUN/BACK_OFF → WALK).
-    const sheetsByUrl: Record<string, SkImage | null> = {};
-    for (const key of Object.keys(sheets) as DogActionKey[]) {
-      const url = manifest.animations[key]?.spritesheetUrl;
-      if (url) {
-        sheetsByUrl[url] = sheets[key] ?? null;
-      }
-    }
-    const down = manifest.mapDirections?.DOWN;
-    const up = manifest.mapDirections?.UP;
-    if (down?.IDLE) sheetsByUrl[down.IDLE.spritesheetUrl] = downIdleSheet;
-    if (down?.WALK) sheetsByUrl[down.WALK.spritesheetUrl] = downWalkSheet;
-    if (up?.IDLE) sheetsByUrl[up.IDLE.spritesheetUrl] = upIdleSheet;
-    if (up?.WALK) sheetsByUrl[up.WALK.spritesheetUrl] = upWalkSheet;
-
     const sheet = sheetsByUrl[selected.clip.spritesheetUrl];
     if (sheet) {
       const clip = selected.clip;
-      // Only SIT/LIE_DOWN ever set subPhase, and neither substitutes a different action
-      // nor has directional art — `clip` here is always the exact same object
-      // dogStateMachine.ts computed dog.subPhase/reverseFromFrame/clipElapsedMs against.
+      // Only SIT/LIE_DOWN ever set subPhase, and neither substitutes a different action —
+      // `clip` here is that action's own art (a directional copy has the same frame timing
+      // as the `animations` clip dogStateMachine.ts computed dog.subPhase etc. against).
       const isOwnState = renderStateOverride === undefined;
       let frameIndex: number;
       if (isOwnState && dog.subPhase === 'REVERSE') {
