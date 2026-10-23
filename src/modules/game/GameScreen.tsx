@@ -19,7 +19,7 @@ import {
   playerWalkSheet,
 } from './core/assets/character/playerWalk';
 import { DOG_IDENTITY_COUNT } from './core/assets/dog/dogWalkAtlas';
-// TEMPORARY, Phase 1 verification only — see localManifest.ts's own header comment.
+// Fallback art for dogs without an approved /assets manifest yet (the demo dogs).
 import { localDogAssetManifest } from './core/assets/dog/real-v1/localManifest';
 import { usePropImages } from './core/assets/usePropImages';
 import { DogSprite } from './core/entities/DogSprite';
@@ -300,10 +300,9 @@ export function GameScreen() {
           if (isBallPlayActive(result.state)) {
             return { ...agent, x: result.dogPos.x, y: result.dogPos.y };
           }
-          // TEMPORARY, Phase 1: every dog uses the same local real-v1 manifest regardless of its
-          // real avatarKey/id (see localManifest.ts's header). The behavior values themselves are
-          // the backend's, as served — no local weight overrides — so each dog moves by its own
-          // settings and PERSON_GREETING recipe (docs/trait-selected-sprites.md).
+          // Each dog's own /assets manifest (bundled real-v1 art if it has none). The behavior
+          // values are the backend's, as served — no local weight overrides — so each dog moves
+          // by its own settings and PERSON_GREETING recipe (docs/trait-selected-sprites.md).
           return tickDog(
             agent,
             settings,
@@ -312,7 +311,7 @@ export function GameScreen() {
             mapLayout.bounds,
             mapLayout.obstacles,
             Math.random,
-            localDogAssetManifest,
+            dogMeta[i].manifest ?? localDogAssetManifest,
             dogMeta[i].behavior.interactions?.PERSON_GREETING ?? null,
           );
         });
@@ -421,8 +420,7 @@ export function GameScreen() {
         <DogSprite
           key={dogMeta[i]?.id ?? i}
           dog={dog}
-          // TEMPORARY, Phase 1 verification only — see localManifest.ts's header.
-          manifest={localDogAssetManifest}
+          manifest={dogMeta[i]?.manifest ?? localDogAssetManifest}
           renderStateOverride={ball && dogMeta[i] ? ballDogPose(ball, dogMeta[i].behavior.settings) ?? undefined : undefined}
           direction={facing}
           envAnimFrame={animFrame}

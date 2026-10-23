@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { fetchDogBehavior, fetchShelterDogs } from '../api/shelters';
+import { fetchDogAssets, fetchDogBehavior, fetchShelterDogs } from '../api/shelters';
 import { normalizeBehavior } from '../behaviorSettings';
-import type { DogBehavior, DogSummary } from '../types';
+import type { DogAssetManifest, DogBehavior, DogSummary } from '../types';
 
 /** Demo: unconfirmed dogs fetch the ball too (see normalizeBehavior). */
 const DEMO_BALL_PLAY = true;
 
 export interface DogWithBehavior extends DogSummary {
   behavior: DogBehavior;
+  /** null = no approved art yet (404) — the game falls back to its bundled sprites. */
+  manifest: DogAssetManifest | null;
 }
 
 export type ShelterDogsState =
@@ -27,10 +29,20 @@ export function useShelterDogs(shelterId: string): ShelterDogsState {
       try {
         const { data: summaries } = await fetchShelterDogs(shelterId, { limit: 20 });
         const withBehavior = await Promise.all(
-          summaries.map(async dog => ({
-            ...dog,
-            behavior: normalizeBehavior((await fetchDogBehavior(dog.id)).data, { demoBallPlay: DEMO_BALL_PLAY }),
-          })),
+          summaries.map(async dog => {
+            const [behavior, manifest] = await Promise.all([
+              fetchDogBehavior(dog.id),
+              fetchDogAssets(dog.id).then(
+                res => res.data,
+                () => null,
+              ),
+            ]);
+            return {
+              ...dog,
+              behavior: normalizeBehavior(behavior.data, { demoBallPlay: DEMO_BALL_PLAY }),
+              manifest,
+            };
+          }),
         );
         if (!cancelled) {
           setState({ status: 'ready', dogs: withBehavior });
