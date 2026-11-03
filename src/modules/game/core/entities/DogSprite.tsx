@@ -70,12 +70,15 @@ export function DogSprite({
     frameIndex = forwardFrame(clip, envAnimFrame * (clip.frames[0]?.durationMs ?? 1));
   }
   const scale = size / manifest.frameSize.width;
+  const frame = clip.frames[frameIndex];
+  // Every clip now points into one per-dog atlas (rows aren't on a frameSize pitch — the
+  // 32px base frames sit on top), so place by the frame's own x/y; fractional col/row is fine.
   return (
     <SpriteFrame
       sheet={sheet}
       frameSize={manifest.frameSize.width}
-      col={frameIndex}
-      row={0}
+      col={frame.x / manifest.frameSize.width}
+      row={frame.y / manifest.frameSize.height}
       x={groundX - manifest.anchorPixels.x * scale}
       y={groundY - manifest.anchorPixels.y * scale}
       size={size}
