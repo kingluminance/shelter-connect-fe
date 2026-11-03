@@ -1,8 +1,6 @@
-// TEMPORARY, Phase 1 only — a stand-in DogAssetManifest built from this bundle's own
-// manifest.json + sheets/*.png so the new manifest-driven playback engine
-// (dogStateMachine.ts's subPhase machinery, DogSprite.tsx) can be verified on a real
-// device with real (if not per-dog) art before the /v1/dogs/{dogId}/assets network call
-// exists. Delete this file (and its one usage in GameScreen.tsx) once Phase 2 lands.
+// A stand-in DogAssetManifest built from this bundle's own manifest.json + sheets/*.png —
+// GameScreen.tsx uses it for dogs whose GET /v1/dogs/{dogId}/assets 404s (no approved
+// per-dog art yet, e.g. the demo dogs).
 import { Image } from 'react-native';
 import type { DogActionKey, DogAssetClip, DogAssetManifest } from '../../../../../dog/types';
 import rawManifest from './manifest.json';

@@ -1,163 +1,102 @@
-import { useImage, type SkImage } from '@shopify/react-native-skia';
+import { Group, Oval, RoundedRect } from '@shopify/react-native-skia';
 import { SpriteFrame } from './SpriteFrame';
 import { forwardFrame, reverseFrame, selectDirectionalClip } from '../systems/spritePlayback';
 import type { DogAgent, DogState } from '../systems/dogStateMachine';
-import {
-  DOG_FRAME_SIZE,
-  DogDirection,
-  dogIdleColumn,
-  dogIdleRow,
-  dogWalkAtlas,
-  dogWalkRow,
-} from '../assets/dog/dogWalkAtlas';
-import type { DogActionKey, DogAssetManifest, DogSpriteDirection } from '../../../dog/types';
+import type { DogSheets } from '../assets/loadDogSheets';
+import type { DogAssetManifest, DogSpriteDirection } from '../../../dog/types';
 
 interface DogSpriteProps {
   dog: DogAgent;
-  /** This dog's real asset manifest, or null to always use the placeholder atlas below. */
-  manifest: DogAssetManifest | null;
+  /** This dog's asset manifest (its own /assets one, or the bundled real-v1 stand-in). */
+  manifest: DogAssetManifest;
+  /** Every sheet `manifest` references, preloaded by loadDogSheets (url → image). */
+  sheets: DogSheets;
   /** Ball-play borrows SNIFF/IDLE poses while a throw is in progress — when set, render
    * this instead of `dog.state`/its sub-phase (a pose override never has reverse-playback
    * timing of its own, so it just rides the shared env clock like any other loop). */
   renderStateOverride?: DogState;
-  /** 4-way facing (docs/map-dog-sprites.md) — DOWN/UP pick that direction's own front/rear
-   * art when the manifest has it, LEFT mirrors RIGHT's, and the placeholder atlas path
-   * below derives its own 3-row FRONT/SIDE/REAR + flipX from this same value. */
+  /** 4-way facing (docs/map-dog-sprites.md) — picks that direction's own art when the
+   * manifest has it, else LEFT mirrors RIGHT's. */
   direction: DogSpriteDirection;
   /** The shared 8-step environment clock (250ms/step) — used for looping actions instead
-   * of a from-scratch per-dog timer, and for the old placeholder atlas's own columns. */
+   * of a from-scratch per-dog timer, and to pulse the skeleton. */
   envAnimFrame: number;
-  /** Which of the 3 placeholder identities to fall back to when there's no real manifest
-   * (or this dog's manifest doesn't have the action it's currently in). */
-  identity: number;
-  /** Screen-space ground/foot position — NOT a top-left corner (each path below picks its
-   * own anchor: the manifest's real `anchorPixels`, or the placeholder atlas's center). */
+  /** Screen-space ground/foot position — NOT a top-left corner (anchored by the manifest's
+   * `anchorPixels`). */
   groundX: number;
   groundY: number;
   size: number;
 }
 
-const PLACEHOLDER_DIRECTION: Record<DogSpriteDirection, { row: DogDirection; flipX: boolean }> = {
-  UP: { row: DogDirection.REAR, flipX: false },
-  DOWN: { row: DogDirection.FRONT, flipX: false },
-  RIGHT: { row: DogDirection.SIDE, flipX: false },
-  LEFT: { row: DogDirection.SIDE, flipX: true },
-};
-
 /**
- * Renders one dog frame from its real per-action manifest (docs/dog-action-playback-spec.md,
- * docs/map-dog-sprites.md) when it has one loaded for the action+direction it's currently
- * in, falling back to the old 3-identity placeholder atlas (dogWalkAtlas.ts) otherwise — a
- * dog with a manifest that's merely missing ONE action (e.g. no SIT asset yet) still falls
- * back per-action, not per-dog, since `selectDirectionalClip` is what actually checks.
+ * Renders one dog frame from its per-action manifest (docs/dog-action-playback-spec.md,
+ * docs/map-dog-sprites.md). If the sheet it needs isn't there (failed to load), draws a
+ * grey skeleton dog instead of some other dog's art.
  */
 export function DogSprite({
   dog,
   manifest,
+  sheets,
   renderStateOverride,
   direction,
   envAnimFrame,
-  identity,
   groundX,
   groundY,
   size,
 }: DogSpriteProps) {
-  // Fixed-count useImage calls (same reasoning as GameScreen.tsx's waterFrames array) —
-  // rules of hooks forbid calling it conditionally per this dog's actual availableActions,
-  // which varies dog to dog. Slots for actions/directions this dog doesn't have just get
-  // `undefined` and resolve to `null`.
-  const sheets: Partial<Record<DogActionKey, SkImage | null>> = {
-    IDLE: useImage(manifest?.animations.IDLE?.spritesheetUrl),
-    WALK: useImage(manifest?.animations.WALK?.spritesheetUrl),
-    RUN: useImage(manifest?.animations.RUN?.spritesheetUrl),
-    SNIFF: useImage(manifest?.animations.SNIFF?.spritesheetUrl),
-    TAIL_WAG: useImage(manifest?.animations.TAIL_WAG?.spritesheetUrl),
-    BACK_OFF: useImage(manifest?.animations.BACK_OFF?.spritesheetUrl),
-    SIT: useImage(manifest?.animations.SIT?.spritesheetUrl),
-    LIE_DOWN: useImage(manifest?.animations.LIE_DOWN?.spritesheetUrl),
-  };
-  // mapDirections currently only ever has IDLE/WALK for DOWN/UP (docs/map-dog-sprites.md) —
-  // fixed slots for just those, not a full 8-action×3-direction cross product that mostly
-  // wouldn't have real files behind it yet.
-  const downIdleSheet = useImage(manifest?.mapDirections?.DOWN?.IDLE?.spritesheetUrl);
-  const downWalkSheet = useImage(manifest?.mapDirections?.DOWN?.WALK?.spritesheetUrl);
-  const upIdleSheet = useImage(manifest?.mapDirections?.UP?.IDLE?.spritesheetUrl);
-  const upWalkSheet = useImage(manifest?.mapDirections?.UP?.WALK?.spritesheetUrl);
-  const fallbackSheet = useImage(dogWalkAtlas);
-
   const state = renderStateOverride ?? dog.state;
-  const selected = manifest ? selectDirectionalClip(manifest, state, direction) : null;
+  const selected = selectDirectionalClip(manifest, state, direction);
+  const sheet = selected ? sheets[selected.clip.spritesheetUrl] : null;
 
-  if (manifest && selected) {
-    // Keyed by URL (unique per file within one manifest) rather than by action/direction,
-    // since `selected` may have substituted a different action's art (RUN/BACK_OFF → WALK).
-    const sheetsByUrl: Record<string, SkImage | null> = {};
-    for (const key of Object.keys(sheets) as DogActionKey[]) {
-      const url = manifest.animations[key]?.spritesheetUrl;
-      if (url) {
-        sheetsByUrl[url] = sheets[key] ?? null;
-      }
-    }
-    const down = manifest.mapDirections?.DOWN;
-    const up = manifest.mapDirections?.UP;
-    if (down?.IDLE) sheetsByUrl[down.IDLE.spritesheetUrl] = downIdleSheet;
-    if (down?.WALK) sheetsByUrl[down.WALK.spritesheetUrl] = downWalkSheet;
-    if (up?.IDLE) sheetsByUrl[up.IDLE.spritesheetUrl] = upIdleSheet;
-    if (up?.WALK) sheetsByUrl[up.WALK.spritesheetUrl] = upWalkSheet;
-
-    const sheet = sheetsByUrl[selected.clip.spritesheetUrl];
-    if (sheet) {
-      const clip = selected.clip;
-      // Only SIT/LIE_DOWN ever set subPhase, and neither substitutes a different action
-      // nor has directional art — `clip` here is always the exact same object
-      // dogStateMachine.ts computed dog.subPhase/reverseFromFrame/clipElapsedMs against.
-      const isOwnState = renderStateOverride === undefined;
-      let frameIndex: number;
-      if (isOwnState && dog.subPhase === 'REVERSE') {
-        frameIndex = reverseFrame(clip, dog.reverseFromFrame, dog.clipElapsedMs).index;
-      } else if (isOwnState && dog.subPhase === 'ENTER') {
-        frameIndex = forwardFrame(clip, dog.clipElapsedMs);
-      } else if (isOwnState && dog.subPhase === 'HOLD') {
-        frameIndex = clip.frames.length - 1;
-      } else {
-        // A plain looping action (or a ball-play pose override, which has no elapsed-time
-        // tracking of its own) — ride the shared env clock converted to ms.
-        frameIndex = forwardFrame(clip, envAnimFrame * (clip.frames[0]?.durationMs ?? 1));
-      }
-      const scale = size / manifest.frameSize.width;
-      return (
-        <SpriteFrame
-          sheet={sheet}
-          frameSize={manifest.frameSize.width}
-          col={frameIndex}
-          row={0}
-          x={groundX - manifest.anchorPixels.x * scale}
-          y={groundY - manifest.anchorPixels.y * scale}
-          size={size}
-          flipX={selected.flipX}
-        />
-      );
-    }
+  if (!selected || !sheet) {
+    return <DogSkeleton groundX={groundX} groundY={groundY} size={size} envAnimFrame={envAnimFrame} />;
   }
 
-  // Fallback: the placeholder atlas, centered on the ground point (its anchor ≈ center).
-  if (!fallbackSheet) {
-    return null;
+  const clip = selected.clip;
+  // Only SIT/LIE_DOWN ever set subPhase, and neither substitutes a different action —
+  // `clip` here is that action's own art (a directional copy has the same frame timing
+  // as the `animations` clip dogStateMachine.ts computed dog.subPhase etc. against).
+  const isOwnState = renderStateOverride === undefined;
+  let frameIndex: number;
+  if (isOwnState && dog.subPhase === 'REVERSE') {
+    frameIndex = reverseFrame(clip, dog.reverseFromFrame, dog.clipElapsedMs).index;
+  } else if (isOwnState && dog.subPhase === 'ENTER') {
+    frameIndex = forwardFrame(clip, dog.clipElapsedMs);
+  } else if (isOwnState && dog.subPhase === 'HOLD') {
+    frameIndex = clip.frames.length - 1;
+  } else {
+    // A plain looping action (or a ball-play pose override, which has no elapsed-time
+    // tracking of its own) — ride the shared env clock converted to ms.
+    frameIndex = forwardFrame(clip, envAnimFrame * (clip.frames[0]?.durationMs ?? 1));
   }
-  const { row: placeholderDirection, flipX } = PLACEHOLDER_DIRECTION[direction];
-  const moving = state === 'WALK' || state === 'RUN' || state === 'BACK_OFF';
-  const row = moving ? dogWalkRow(identity, placeholderDirection) : dogIdleRow(identity);
-  const col = moving ? envAnimFrame : dogIdleColumn(state, envAnimFrame);
+  const scale = size / manifest.frameSize.width;
+  const frame = clip.frames[frameIndex];
+  // Every clip now points into one per-dog atlas (rows aren't on a frameSize pitch — the
+  // 32px base frames sit on top), so place by the frame's own x/y; fractional col/row is fine.
   return (
     <SpriteFrame
-      sheet={fallbackSheet}
-      frameSize={DOG_FRAME_SIZE}
-      col={col}
-      row={row}
-      x={groundX - size / 2}
-      y={groundY - size / 2}
+      sheet={sheet}
+      frameSize={manifest.frameSize.width}
+      col={frame.x / manifest.frameSize.width}
+      row={frame.y / manifest.frameSize.height}
+      x={groundX - manifest.anchorPixels.x * scale}
+      y={groundY - manifest.anchorPixels.y * scale}
       size={size}
-      flipX={flipX}
+      flipX={selected.flipX}
     />
+  );
+}
+
+/** Grey, gently pulsing dog-shaped blob (body + head + ground shadow) standing on the ground point. */
+function DogSkeleton({ groundX, groundY, size, envAnimFrame }: { groundX: number; groundY: number; size: number; envAnimFrame: number }) {
+  const opacity = 0.35 + 0.15 * Math.sin((envAnimFrame / 8) * Math.PI * 2);
+  const body = { w: size * 0.5, h: size * 0.3 };
+  const head = size * 0.26;
+  return (
+    <Group opacity={opacity}>
+      <Oval x={groundX - size * 0.3} y={groundY - size * 0.06} width={size * 0.6} height={size * 0.12} color="#00000055" />
+      <RoundedRect x={groundX - body.w / 2} y={groundY - body.h} width={body.w} height={body.h} r={body.h / 2} color="#c9c4cf" />
+      <RoundedRect x={groundX + body.w / 2 - head * 0.7} y={groundY - body.h - head * 0.7} width={head} height={head} r={head / 3} color="#c9c4cf" />
+    </Group>
   );
 }

@@ -19,10 +19,11 @@ import {
   playerWalkSheet,
 } from './core/assets/character/playerWalk';
 import { DOG_IDENTITY_COUNT } from './core/assets/dog/dogWalkAtlas';
-// TEMPORARY, Phase 1 verification only — see localManifest.ts's own header comment.
+// Fallback art for dogs without an approved /assets manifest yet (the demo dogs).
 import { localDogAssetManifest } from './core/assets/dog/real-v1/localManifest';
 import { usePropImages } from './core/assets/usePropImages';
 import { DogSprite } from './core/entities/DogSprite';
+import { loadDogSheets, type DogSheets } from './core/assets/loadDogSheets';
 import { SpriteFrame } from './core/entities/SpriteFrame';
 import { createDogAgent, tickDog, type DogAgent, type DogState } from './core/systems/dogStateMachine';
 import { movementFacing } from './core/systems/spritePlayback';
@@ -176,6 +177,8 @@ export function GameScreen() {
   const [player, setPlayer] = useState(mapLayout.spawn);
   const [dogs, setDogs] = useState<DogAgent[]>([]);
   const [dogMeta, setDogMeta] = useState<DogWithBehavior[]>([]);
+  const [dogSheets, setDogSheets] = useState<DogSheets[]>([]);
+  const [dogsSpawned, setDogsSpawned] = useState(false);
   const [animFrame, setAnimFrame] = useState(0);
   const [playerAnimStep, setPlayerAnimStep] = useState(0);
   const isMoving = useRef(false);
@@ -190,9 +193,20 @@ export function GameScreen() {
   // React state straight back into the same tick's obstacle list.
   const dogsRef = useRef<DogAgent[]>([]);
 
-  // Spawn one dog per slot once the shelter's dogs + behavior settings arrive.
+  // Spawn one dog per slot once the shelter's dogs + behavior settings arrive AND every
+  // dog's sheets are loaded — the loading screen covers the map until then, so dogs never
+  // appear as placeholder art first and swap later.
   useEffect(() => {
-    if (shelterDogs.status === 'ready') {
+    if (shelterDogs.status !== 'ready') {
+      return;
+    }
+    let cancelled = false;
+    Promise.all(shelterDogs.dogs.map(dog => loadDogSheets(dog.manifest ?? localDogAssetManifest))).then(sheets => {
+      if (cancelled) {
+        return;
+      }
+      setDogSheets(sheets);
+      setDogsSpawned(true);
       setDogMeta(shelterDogs.dogs);
       setDogs(
         shelterDogs.dogs.map((_, i) => {
@@ -204,7 +218,10 @@ export function GameScreen() {
         const slot = mapLayout.slots[i % mapLayout.slots.length];
         return createBallPlayState(slot.x, slot.y);
       });
-    }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [shelterDogs]);
 
   useEffect(() => {
@@ -300,10 +317,9 @@ export function GameScreen() {
           if (isBallPlayActive(result.state)) {
             return { ...agent, x: result.dogPos.x, y: result.dogPos.y };
           }
-          // TEMPORARY, Phase 1: every dog uses the same local real-v1 manifest regardless of its
-          // real avatarKey/id (see localManifest.ts's header). The behavior values themselves are
-          // the backend's, as served — no local weight overrides — so each dog moves by its own
-          // settings and PERSON_GREETING recipe (docs/trait-selected-sprites.md).
+          // Each dog's own /assets manifest (bundled real-v1 art if it has none). The behavior
+          // values are the backend's, as served — no local weight overrides — so each dog moves
+          // by its own settings and PERSON_GREETING recipe (docs/trait-selected-sprites.md).
           return tickDog(
             agent,
             settings,
@@ -312,7 +328,7 @@ export function GameScreen() {
             mapLayout.bounds,
             mapLayout.obstacles,
             Math.random,
-            localDogAssetManifest,
+            dogMeta[i].manifest ?? localDogAssetManifest,
             dogMeta[i].behavior.interactions?.PERSON_GREETING ?? null,
           );
         });
@@ -411,7 +427,6 @@ export function GameScreen() {
   let ballDogIndex: number | null = null;
 
   dogs.forEach((dog, i) => {
-    const identity = i % DOG_IDENTITY_COUNT;
     const ball = ballStatesRef.current[i];
     const ballActive = ball ? isBallPlayActive(ball) : false;
     const facing = dogFacingRef.current[i] ?? DEFAULT_DOG_FACING;
@@ -421,12 +436,11 @@ export function GameScreen() {
         <DogSprite
           key={dogMeta[i]?.id ?? i}
           dog={dog}
-          // TEMPORARY, Phase 1 verification only — see localManifest.ts's header.
-          manifest={localDogAssetManifest}
+          manifest={dogMeta[i]?.manifest ?? localDogAssetManifest}
+          sheets={dogSheets[i] ?? {}}
           renderStateOverride={ball && dogMeta[i] ? ballDogPose(ball, dogMeta[i].behavior.settings) ?? undefined : undefined}
           direction={facing}
           envAnimFrame={animFrame}
-          identity={identity}
           groundX={toScreenX(dog.x + DOG_SPRITE_OFFSET.x)}
           groundY={toScreenY(dog.y + DOG_SPRITE_OFFSET.y)}
           size={DOG_DISPLAY_SIZE * scale}
@@ -639,10 +653,11 @@ export function GameScreen() {
             <Text style={styles.throwButtonText}>{ballButton.label}</Text>
           </Pressable>
         )}
-        {shelterDogs.status === 'loading' && (
-          <View style={styles.statusBanner}>
-            <ActivityIndicator color="#fff" />
-            <Text style={styles.statusText}>강아지 불러오는 중… (서버가 잠들어 있으면 최대 1분)</Text>
+        {shelterDogs.status !== 'error' && !dogsSpawned && (
+          <View style={styles.loadingScreen}>
+            <ActivityIndicator size="large" color="#b19bc2" />
+            <Text style={styles.loadingTitle}>운동장에 들어가는 중…</Text>
+            <Text style={styles.loadingText}>친구들을 불러오고 있어요</Text>
           </View>
         )}
         {shelterDogs.status === 'error' && (
@@ -697,6 +712,22 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 17,
     fontWeight: '700',
+  },
+  loadingScreen: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#f6f1fa',
+  },
+  loadingTitle: {
+    color: '#4a3d55',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  loadingText: {
+    color: '#8a7d96',
+    fontSize: 14,
   },
   statusBanner: {
     position: 'absolute',

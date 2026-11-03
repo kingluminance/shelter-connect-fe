@@ -1,5 +1,5 @@
 import { apiFetch } from '../../../shared/lib/apiClient';
-import type { DogBehavior, DogPhoto, DogProfile, DogSummary, Page, Shelter, ShelterDetail } from '../types';
+import type { DogAssetManifest, DogBehavior, DogPhoto, DogProfile, DogSummary, Page, Shelter, ShelterDetail } from '../types';
 
 export function fetchShelters(params?: { region?: string; limit?: number; cursor?: string }) {
   const query = new URLSearchParams();
@@ -28,6 +28,12 @@ export function fetchDog(dogId: string) {
 
 export function fetchDogBehavior(dogId: string) {
   return apiFetch<{ data: DogBehavior }>(`/v1/dogs/${dogId}/behavior`);
+}
+
+// docs/dog-action-playback-spec.md — 404 when the dog has no approved art yet. Sheet URLs are
+// signed and expire ~60s after this response, so load them right away.
+export function fetchDogAssets(dogId: string) {
+  return apiFetch<{ data: DogAssetManifest }>(`/v1/dogs/${dogId}/assets`);
 }
 
 // docs/photo-read-api.md — 403 PHOTO_LOCKED until the caller has a COMPLETED chat
